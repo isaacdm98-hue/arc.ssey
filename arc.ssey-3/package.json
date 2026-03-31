@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "react-dom": "^19.1.1",
-    "@google/genai": "^1.19.0",
     "react": "^19.1.1",
     "simplex-noise": "4.0.1",
     "tone": "^15.1.22",

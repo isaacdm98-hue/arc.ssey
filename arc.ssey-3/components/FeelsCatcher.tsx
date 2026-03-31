@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 
 const ALL_FEELS = [
-  "I like hearing the shipping forecast", "I love cats being silly", "I like to keep my research on track", 
-  "Rap Battles", "Cozy rainy days", "8-bit video game music", "Learning about space", 
-  "Vintage computer aesthetics", "Stand-up comedy", "Obscure documentaries", "Live folk music", 
-  "Watching old cartoons", "The sound of a dial-up modem", "Exploring abandoned places", 
-  "Silent films", "Cryptic puzzles and ARGs", "DIY electronics projects", "Listening to poetry", 
-  "Skateboarding videos", "Early 2000s internet culture", "Jazz clubs at midnight", "Monster truck rallies",
-  "Watching chess tournaments", "Learning a new language", "Deep sea exploration", "Stories about pirates"
+  "nostalgic", "melancholy", "curious", "adventurous", "peaceful",
+  "rebellious", "dreamy", "energetic", "romantic", "mysterious",
+  "Cozy rainy days", "8-bit video game music", "Learning about space",
+  "Vintage computer aesthetics", "Obscure documentaries", "Live folk music",
+  "The sound of a dial-up modem", "Exploring abandoned places",
+  "Silent films", "Cryptic puzzles", "DIY electronics",
+  "Early 2000s internet culture", "Jazz clubs at midnight",
+  "Deep sea exploration", "Stories about pirates", "Old radio shows",
+  "Lo-fi beats", "Thunderstorms", "Stargazing", "Library whispers",
 ];
 
 // Pre-calculate random properties for consistent rendering

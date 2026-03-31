@@ -3,16 +3,18 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ContentViewerModal } from './components/ContentViewerModal';
 import ThreeScene, { type ThreeSceneHandle } from './components/ThreeScene';
 import { getTarotSpread, fetchInitialContent, searchRadioStations, type ContentPayload, fetchRandomFishData } from './services/archiveService';
-import { generateCuratedSearchQueries, generateGullMessage, type CuratedQueries } from './services/geminiService';
+import { generateCuratedSearchQueries, generateGullMessage, type CuratedQueries } from './services/searchService';
 import { AudioBus } from './components/AudioBus';
-import type { RadioStatus, ThemedRadioStation, IslandContent, WaybackResult, VideoResult, TarotSpread, FestivalData, FishData, FishingMinigameState } from './types';
-import { LoadingIcon, RadioIcon, RetuneIcon, FishIcon } from './components/Icons';
+import type { RadioStatus, ThemedRadioStation, IslandContent, WaybackResult, VideoResult, TarotSpread, FestivalData, FishData, FishingMinigameState, JournalState } from './types';
+import { LoadingIcon, RadioIcon, RetuneIcon, FishIcon, JournalIcon } from './components/Icons';
 import { TuningDial } from './components/TuningDial';
 import { RadioPanel } from './components/RadioPanel';
 import { TarotReadingModal } from './components/TarotReadingModal';
+import { JournalModal } from './components/JournalModal';
 import { SystemMessage } from './components/SystemMessage';
 import { Intro } from './components/Intro';
 import { FeelsCatcher } from './components/FeelsCatcher';
+import { loadJournal, createJournal, logDiscovery, logCatch, logRadio } from './services/journalService';
 import { Euler } from 'three';
 import type { Vector3, Quaternion } from 'three';
 
@@ -48,24 +50,50 @@ const FishingOverlay: React.FC<{ state: FishingMinigameState; tension: number }>
     );
 };
 
+const getStatusColor = (status: string) => {
+    if (status.includes('Critically')) return 'text-red-400';
+    if (status.includes('Endangered')) return 'text-orange-400';
+    if (status.includes('Vulnerable')) return 'text-yellow-400';
+    if (status.includes('Near Threatened')) return 'text-amber-300';
+    return 'text-green-400';
+};
+
+const getStatusGlow = (status: string) => {
+    if (status.includes('Critically')) return '0 0 8px rgba(248,113,113,0.6)';
+    if (status.includes('Endangered')) return '0 0 8px rgba(251,146,60,0.6)';
+    if (status.includes('Vulnerable')) return '0 0 8px rgba(250,204,21,0.6)';
+    return '0 0 8px rgba(74,222,128,0.6)';
+};
+
 const FishCaughtCard: React.FC<{ fish: FishData; onClose: () => void }> = ({ fish, onClose }) => (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center font-crt bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
-        <div 
+        <div
             className="w-full max-w-md bg-[#0a1a0f] border-2 border-green-900/80 rounded-lg shadow-lg flex flex-col animate-fadeIn p-6 text-center"
             style={{ boxShadow: '0 0 40px rgba(0,255,0,.2), 0 0 10px rgba(0,0,0,.5)' }}
             onClick={e => e.stopPropagation()}
         >
-            <h2 className="text-2xl text-cyan-300 tracking-widest mb-4" style={{textShadow: '0 0 4px rgba(0,255,255,0.5)'}}>
+            <h2 className="text-2xl text-cyan-300 tracking-widest mb-2" style={{textShadow: '0 0 4px rgba(0,255,255,0.5)'}}>
                 {`SPECIMEN: ${fish.name.toUpperCase()}`}
             </h2>
+            {fish.conservationStatus && (
+                <div className="mb-4 flex items-center justify-center gap-2">
+                    <span className="text-xs text-green-600 tracking-wider">CONSERVATION STATUS:</span>
+                    <span
+                        className={`text-sm font-bold tracking-wider ${getStatusColor(fish.conservationStatus)}`}
+                        style={{ textShadow: getStatusGlow(fish.conservationStatus) }}
+                    >
+                        {fish.conservationStatus.toUpperCase()}
+                    </span>
+                </div>
+            )}
             {fish.imageUrl && <img src={fish.imageUrl} alt={fish.name} className="w-full h-48 object-cover rounded-md mb-4 border-2 border-green-900/50" />}
-            <p className="text-green-300 text-base leading-relaxed mb-6 text-left max-h-40 overflow-y-auto">
+            <p className="text-green-300 text-base leading-relaxed mb-6 text-left max-h-40 overflow-y-auto custom-scrollbar">
                 {fish.summary}
             </p>
-            <button 
-                onClick={onClose} 
+            <button
+                onClick={onClose}
                 className="px-6 py-2 text-lg text-black bg-cyan-300 hover:bg-white transition-colors">
-                Continue
+                Log to Journal
             </button>
         </div>
     </div>
@@ -146,12 +174,13 @@ const GullMessage: React.FC<{ message: string | null, position: { x: number, y: 
 };
 
 const loadingMessages = [
-    "Contacting archival AI assistant...",
+    "Scanning the Internet Archive...",
     "Tuning carrier wave to topic signal...",
     "Searching for stable radio signals...",
-    "Calibrating deep-sea sensors...",
+    "Querying Wikipedia for related artifacts...",
     "Populating the data-sea...",
-    "Finalizing navigation coordinates...",
+    "Calibrating deep-sea sensors...",
+    "Charting archival coordinates...",
 ];
 
 export default function App() {
@@ -179,6 +208,9 @@ export default function App() {
   const [systemMessage, setSystemMessage] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
   const messageKey = useRef(0);
+
+  const [journal, setJournal] = useState<JournalState | null>(null);
+  const [isJournalOpen, setJournalOpen] = useState(false);
 
   const [sustenance, setSustenance] = useState(1);
   const [isFishing, setIsFishing] = useState(false);
@@ -223,6 +255,13 @@ export default function App() {
 
   const handleTopicSubmitted = (topic: string) => {
     topicRef.current = topic;
+    // Load existing journal or create new one
+    const existingJournal = loadJournal();
+    if (existingJournal && existingJournal.topic === topic) {
+        setJournal(existingJournal);
+    } else {
+        setJournal(createJournal(topic));
+    }
     setAppState('feels_catcher');
   };
   
@@ -336,8 +375,13 @@ export default function App() {
     if(fish) {
         setCaughtFish(fish);
         setSustenance(1);
+        // Auto-log catch to journal
+        if (journal) {
+            const updated = logCatch(journal, fish.name, fish.summary, fish.conservationStatus || 'Unknown', fish.imageUrl || undefined);
+            setJournal(updated);
+        }
     }
-  }, []);
+  }, [journal]);
 
   const handleFishingEnd = useCallback(() => {
     setIsFishing(false);
@@ -349,7 +393,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    const shouldBePaused = !!activeContent || isRadioPanelOpen || isTarotModalOpen || isFishing;
+    const shouldBePaused = !!activeContent || isRadioPanelOpen || isTarotModalOpen || isJournalOpen || isFishing;
     if (shouldBePaused) {
       threeSceneRef.current?.pause();
     } else {
@@ -381,6 +425,16 @@ export default function App() {
       setActiveContent(content);
       setActiveContentPosition(position);
       handlePlayStation(null);
+      // Auto-log discovery to journal
+      if (journal) {
+          let title = 'Unknown Signal';
+          let url: string | undefined;
+          if (content.type === 'web') { title = content.data.originalUrl; url = content.data.url; }
+          if (content.type === 'video') { title = content.data.title; url = `https://archive.org/details/${content.data.identifier}`; }
+          if (content.type === 'festival') { title = `${content.data.name} ${content.data.year}`; }
+          const updated = logDiscovery(journal, content.type, title, url);
+          setJournal(updated);
+      }
   };
   
   const handleCloseViewer = () => {
@@ -479,14 +533,21 @@ export default function App() {
                 </div>
             </div>
             <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
-                <button 
+                <button
+                  onClick={() => setJournalOpen(true)}
+                  className="p-2 bg-black/30 border-2 border-amber-400/50 rounded-sm hover:bg-amber-400/30 transition-colors pointer-events-auto"
+                  aria-label="Open journal"
+                >
+                  <JournalIcon className="w-6 h-6 text-amber-300" />
+                </button>
+                <button
                   onClick={handleRetune}
                   className="p-2 bg-black/30 border-2 border-cyan-400/50 rounded-sm hover:bg-cyan-400/30 transition-colors pointer-events-auto"
                   aria-label="Retune - Find more radio stations"
                 >
                   <RetuneIcon className="w-6 h-6" />
                 </button>
-                 <button 
+                 <button
                     onClick={() => setRadioPanelOpen(true)}
                     className="p-2 bg-black/30 border-2 border-cyan-400/50 rounded-sm hover:bg-cyan-400/30 transition-colors pointer-events-auto"
                     aria-label="Open radio station list"
@@ -532,6 +593,13 @@ export default function App() {
         isOpen={isTarotModalOpen}
         onClose={() => setTarotModalOpen(false)}
         spread={tarotSpread}
+      />
+
+      <JournalModal
+        isOpen={isJournalOpen}
+        onClose={() => setJournalOpen(false)}
+        journal={journal}
+        onJournalUpdate={setJournal}
       />
       
       <SystemMessage message={systemMessage} key={messageKey.current} />
