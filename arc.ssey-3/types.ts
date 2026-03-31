@@ -24,6 +24,26 @@ export interface FishData {
     name: string;
     summary: string;
     imageUrl: string | null;
+    conservationStatus?: string;
+}
+
+// --- Journal & Logbook Types ---
+
+export interface JournalEntry {
+    id: string;
+    timestamp: number;
+    type: 'discovery' | 'note' | 'catch' | 'radio' | 'tarot';
+    title: string;
+    body: string;
+    imageUrl?: string;
+    metadata?: Record<string, string>;
+}
+
+export interface JournalState {
+    entries: JournalEntry[];
+    topic: string;
+    startedAt: number;
+    sessionsCompleted: number;
 }
 
 // --- Content & Archive Types ---

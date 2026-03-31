@@ -135,17 +135,19 @@ export const ContentViewerModal: React.FC<{
     );
   };
 
+  const isVideoType = content.type === 'video';
+
   const renderStandardContent = () => (
       <main className="p-2 bg-[#0a1a0f] flex-grow">
             <div className="relative w-full h-full bg-black/50 rounded border border-green-900/50 overflow-hidden flex items-center justify-center">
               {isIframeLoading && !loadingError && (
                 <div className="flex flex-col items-center text-green-400">
                     <LoadingIcon className="w-8 h-8 animate-spin mb-2" />
-                    <p>Accessing Archive...</p>
+                    <p>{isVideoType ? 'Recovering signal...' : 'Accessing Archive...'}</p>
                 </div>
               )}
               {loadingError && <p className="text-rose-400 p-4 text-center">{loadingError}</p>}
-              <iframe 
+              <iframe
                 src={getUrl()}
                 title={getTitle()}
                 className={`w-full h-full border-0 absolute inset-0 transition-opacity duration-300 ${isIframeLoading || loadingError ? 'opacity-0' : 'opacity-100'}`}
@@ -154,6 +156,15 @@ export const ContentViewerModal: React.FC<{
                 onLoad={() => setIsIframeLoading(false)}
                 onError={handleIframeError}
               />
+              {/* CRT scanline overlay for video content — subtle, doesn't block viewing */}
+              {isVideoType && !isIframeLoading && !loadingError && (
+                <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
+                     style={{
+                       backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)',
+                       backgroundSize: '100% 2px',
+                     }}
+                />
+              )}
             </div>
       </main>
   );

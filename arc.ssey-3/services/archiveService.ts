@@ -1,7 +1,7 @@
 
 import type { ThemedRadioStation, WaybackResult, VideoResult, TarotSpread, FestivalData, FishData } from '../types';
 import { MARSEILLE_DECK, TAROT_SPREADS } from './tarotData';
-import type { CuratedQueries } from './geminiService';
+import type { CuratedQueries } from './searchService';
 
 // --- TYPES ---
 interface ArchiveDoc {
@@ -295,30 +295,67 @@ export async function getTarotSpread(topic: string): Promise<TarotSpread> {
     };
 }
 
-// --- WIKIPEDIA SNIPPET (FISH) ---
-const FISH_LIST = [ 'Atlantic cod', 'Sailfish', 'Mahi-mahi', 'Wahoo', 'Yellowfin tuna', 'Blue marlin', 'Giant trevally', 'Coelacanth', 'Oarfish', 'Anglerfish', 'Blobfish', 'Goliath grouper', 'Ocean sunfish', 'Lionfish' ];
+// --- WIKIPEDIA ENDANGERED ANIMALS ---
+// Real animals from Earth — a sweet way to learn about conservation while archiving
+const ANIMAL_LIST: { name: string; conservationStatus: string }[] = [
+    { name: 'Blue whale', conservationStatus: 'Endangered' },
+    { name: 'Sea otter', conservationStatus: 'Endangered' },
+    { name: 'Vaquita', conservationStatus: 'Critically Endangered' },
+    { name: 'Hawksbill sea turtle', conservationStatus: 'Critically Endangered' },
+    { name: 'Atlantic bluefin tuna', conservationStatus: 'Endangered' },
+    { name: 'Whale shark', conservationStatus: 'Endangered' },
+    { name: 'Coelacanth', conservationStatus: 'Critically Endangered' },
+    { name: 'Giant manta ray', conservationStatus: 'Endangered' },
+    { name: 'Maui dolphin', conservationStatus: 'Critically Endangered' },
+    { name: 'Humphead wrasse', conservationStatus: 'Endangered' },
+    { name: 'Leatherback sea turtle', conservationStatus: 'Vulnerable' },
+    { name: 'Great white shark', conservationStatus: 'Vulnerable' },
+    { name: 'Dugong', conservationStatus: 'Vulnerable' },
+    { name: 'European eel', conservationStatus: 'Critically Endangered' },
+    { name: 'Hammerhead shark', conservationStatus: 'Critically Endangered' },
+    { name: 'Mediterranean monk seal', conservationStatus: 'Endangered' },
+    { name: 'Narwhal', conservationStatus: 'Vulnerable' },
+    { name: 'Oarfish', conservationStatus: 'Least Concern' },
+    { name: 'Ocean sunfish', conservationStatus: 'Vulnerable' },
+    { name: 'North Atlantic right whale', conservationStatus: 'Critically Endangered' },
+    { name: 'Galapagos penguin', conservationStatus: 'Endangered' },
+    { name: 'Axolotl', conservationStatus: 'Critically Endangered' },
+    { name: 'Beluga sturgeon', conservationStatus: 'Critically Endangered' },
+    { name: 'Giant Pacific octopus', conservationStatus: 'Least Concern' },
+    { name: 'Horseshoe crab', conservationStatus: 'Vulnerable' },
+    { name: 'Leafy seadragon', conservationStatus: 'Near Threatened' },
+    { name: 'Nautilus', conservationStatus: 'Endangered' },
+    { name: 'Green sea turtle', conservationStatus: 'Endangered' },
+];
+
 export async function fetchRandomFishData(): Promise<FishData | null> {
     try {
-        const randomFish = FISH_LIST[Math.floor(Math.random() * FISH_LIST.length)];
-        const summaryEndpoint = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(randomFish)}`;
-        
+        const animal = ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)];
+        const summaryEndpoint = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(animal.name)}`;
+
         const summaryResponse = await fetch(summaryEndpoint, { headers: { 'Accept': 'application/json; charset=utf-8' } });
         if (!summaryResponse.ok) throw new Error(`Wikipedia summary API error: ${summaryResponse.status}`);
-        
+
         const summaryData = await summaryResponse.json();
-        
-        const name = summaryData.title || randomFish;
+
+        const name = summaryData.title || animal.name;
         const summary = summaryData.extract || 'No description available.';
         const imageUrl = summaryData.thumbnail?.source || null;
-        
-        return { name, summary, imageUrl };
+
+        return {
+            name,
+            summary,
+            imageUrl,
+            conservationStatus: animal.conservationStatus,
+        };
 
     } catch (e) {
-        console.error("Failed to fetch fish data:", e);
+        console.error("Failed to fetch animal data:", e);
         return {
-            name: "Data Glitch",
-            summary: "A strange anomaly corrupted the data stream. The identity of this catch is a mystery.",
+            name: "Unknown Specimen",
+            summary: "A strange anomaly corrupted the data stream. The identity of this catch remains a mystery of the deep.",
             imageUrl: null,
+            conservationStatus: 'Data Unavailable',
         };
     }
 }

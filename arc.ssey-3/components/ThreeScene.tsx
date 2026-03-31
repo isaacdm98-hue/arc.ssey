@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState } from 'react';
 import {
-  ACESFilmicToneMapping, AdditiveBlending, AmbientLight, BoxGeometry, BufferGeometry, Color, ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Float32BufferAttribute, FogExp2, Group, HemisphereLight, MathUtils, Mesh, MeshBasicMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Points, PointsMaterial, Raycaster, RepeatWrapping, Scene, SphereGeometry, SRGBColorSpace, TextureLoader, TorusGeometry, Vector2, Vector3, WebGLRenderer, Clock as ThreeClock, Object3D, LineSegments, LineBasicMaterial, ShaderMaterial, BackSide, IcosahedronGeometry, ShadowMaterial, Quaternion, Euler, SpotLight, CubeTextureLoader, LoopOnce, TubeGeometry,
-  CatmullRomCurve3, CanvasTexture, SpriteMaterial, Sprite, Line
+  ACESFilmicToneMapping, AdditiveBlending, AmbientLight, BoxGeometry, BufferGeometry, Color, ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Float32BufferAttribute, FogExp2, Group, HemisphereLight, MathUtils, Mesh, MeshBasicMaterial, MeshPhysicalMaterial, MeshStandardMaterial, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Points, PointsMaterial, Raycaster, RepeatWrapping, Scene, SphereGeometry, SRGBColorSpace, TextureLoader, TorusGeometry, Vector2, Vector3, WebGLRenderer, Clock as ThreeClock, Object3D, LineSegments, LineBasicMaterial, ShaderMaterial, BackSide, IcosahedronGeometry, ShadowMaterial, Quaternion, Euler, SpotLight, LoopOnce, TubeGeometry,
+  CatmullRomCurve3, CanvasTexture, SpriteMaterial, Sprite, Line,
 } from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -17,6 +17,7 @@ import { RoundedBoxGeometry } from './geometries/RoundedBoxGeometry';
 import type { IslandContent, WaybackResult, VideoResult, FestivalData, FishData, FishingMinigameState } from '../types';
 import { ParticleTrail } from './ParticleTrail';
 import { SeaLifeManager } from './SeaLifeManager';
+import { NebulaSkybox } from './NebulaSkybox';
 import type { AudioBus } from './AudioBus';
 
 interface GhostFrame {
@@ -223,7 +224,15 @@ class IslandManager {
              // Update logic for islands in active cells (e.g., animations)
             group.children.forEach(island => {
                 if (island.userData.rotator) {
-                    island.userData.rotator.rotation.y += 0.005;
+                    island.userData.rotator.rotation.y += 0.003;
+                }
+                // Animate CRT screen shaders on video islands
+                if (island.userData.screenShader) {
+                    island.userData.screenShader.uniforms.uTime.value += 0.016;
+                }
+                // Gentle bob on water
+                if (island instanceof Group && island.userData.content) {
+                    island.position.y = -10 + Math.sin(time * 0.5 + island.position.x * 0.001) * 3;
                 }
             });
         }
@@ -297,129 +306,204 @@ class IslandManager {
   private createIsland(content: IslandContent, random: () => number): Group {
       const islandGroup = new Group();
       islandGroup.userData.content = content;
-      let radius = random() * 150 + 80; islandGroup.userData.radius = radius;
-      
-      const crystalMat = new MeshStandardMaterial({ color: 0x88ddff, emissive: 0x44aabb, transparent: true, opacity: 0.7 });
-      const islandBaseColor = new Color(0x334455);
-      islandBaseColor.setHSL(random() * 0.1 + 0.55, 0.2, random() * 0.1 + 0.2);
-      const islandMat = new MeshStandardMaterial({ color: islandBaseColor, roughness: 0.8, metalness: 0.1 });
-      const screenMat = new MeshStandardMaterial({ color: 0x111, emissive: 0x66aaff, emissiveIntensity: 1.5, toneMapped: false });
-      
-      let highestY = 0;
-      
-      if (content.type === 'festival') {
-          radius = 300;
-          islandGroup.userData.radius = radius;
-          islandBaseColor.setHSL(0.85, 0.5, 0.4);
-          islandMat.color = islandBaseColor;
-          islandMat.emissive.set(0x8a2be2);
-          islandMat.emissiveIntensity = 0.5;
-      }
-      
-      const islandShapeType = random();
-      let geo: BufferGeometry;
-      const seed = random() * 100;
-      const tempVec = new Vector3();
+      let radius = 120; islandGroup.userData.radius = radius;
 
-      if (islandShapeType < 0.6) { // 60% standard terrain
-          const segments = 32;
-          geo = new PlaneGeometry(radius * 2, radius * 2, segments, segments);
-          const positions = geo.attributes.position;
-          for (let j = 0; j < positions.count; j++) {
-              const x = positions.getX(j); const y = positions.getY(j);
-              const dist = Math.sqrt(x*x + y*y) / radius;
-              const h1 = (this.noise3D(x/150 + seed, y/150 + seed, 0) + 1) * 0.5 * 120;
-              const h2 = (this.noise3D(x/40 + seed, y/40 + seed, 1) + 1) * 0.5 * 45;
-              const edgeFactor = 1.0 - Math.pow(dist, 2);
-              const z = (h1 + h2) * edgeFactor;
-              positions.setZ(j, z);
-              if (z > highestY) highestY = z;
-          }
-          geo.rotateX(-Math.PI / 2);
-      } else if (islandShapeType < 0.8) { // 20% atoll/ring
-          geo = new TorusGeometry(radius, radius * (0.2 + random() * 0.2), 16, 64);
-          const positions = geo.attributes.position;
-          for (let j = 0; j < positions.count; j++) {
-              tempVec.fromBufferAttribute(positions, j);
-              const noise = this.noise3D(tempVec.x / 50 + seed, tempVec.y / 50 + seed, tempVec.z / 50 + seed) * 30;
-              tempVec.normalize().multiplyScalar(noise);
-              positions.setXYZ(j, positions.getX(j) + tempVec.x, positions.getY(j) + tempVec.y, positions.getZ(j) + tempVec.z);
-              if(positions.getY(j) > highestY) highestY = positions.getY(j);
-          }
-          geo.rotateX(Math.PI / 2);
-      } else { // 20% pillar
-          geo = new CylinderGeometry(radius * (0.6 + random() * 0.2), radius, 250 + random() * 150, 32, 8);
-          const positions = geo.attributes.position;
-          for (let j = 0; j < positions.count; j++) {
-              tempVec.fromBufferAttribute(positions, j);
-              const noise = this.noise3D(tempVec.x / 80 + seed, tempVec.y / 80 + seed, tempVec.z / 80 + seed) * 25;
-              positions.setXYZ(j, positions.getX(j) + noise, positions.getY(j), positions.getZ(j) + noise);
-          }
-          geo.translate(0, -100, 0);
-          highestY = 150;
-      }
-      geo.computeVertexNormals();
-      
-      const islandMesh = new Mesh(geo, islandMat);
-      islandMesh.receiveShadow = true; islandMesh.castShadow = true;
-      islandGroup.add(islandMesh);
-
-      const positions = geo.attributes.position;
-      if(positions.count > 0) {
-          for (let i = 0; i < 5; i++) {
-              if (random() < 0.1) {
-                  const vertIndex = Math.floor(random() * positions.count);
-                  const crystalGeo = new IcosahedronGeometry(random() * 5 + 2, 0);
-                  const crystal = new Mesh(crystalGeo, crystalMat);
-                  crystal.position.set(positions.getX(vertIndex), positions.getY(vertIndex) + 5, positions.getZ(vertIndex));
-                  islandMesh.add(crystal);
-              }
-          }
-      }
-
+      // Each content type gets a unique, iconic object floating on the water
       if (content.type === 'video') {
-          const screenGeo = new BoxGeometry(5, 50, 80);
-          const screen = new Mesh(screenGeo, screenMat);
-          screen.position.y = highestY + 25;
-          screen.rotation.y = random() * Math.PI;
-          islandGroup.add(screen);
+          // === CRT TV floating on the water ===
+          radius = 100; islandGroup.userData.radius = radius;
+          const crtGroup = new Group();
+
+          // TV body — chunky retro CRT
+          const bodyGeo = new RoundedBoxGeometry(60, 50, 45, 2, 3);
+          const bodyMat = new MeshPhysicalMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.3 });
+          const body = new Mesh(bodyGeo, bodyMat);
+          crtGroup.add(body);
+
+          // Screen — glowing blue-green with scanlines
+          const screenShader = new ShaderMaterial({
+              uniforms: { uTime: { value: random() * 100 } },
+              vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+              fragmentShader: `
+                  uniform float uTime; varying vec2 vUv;
+                  float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453); }
+                  void main() {
+                      float scanline = sin(vUv.y * 150.0 + uTime * 2.0) * 0.08 + 0.92;
+                      float noise = rand(vUv + fract(uTime * 0.1)) * 0.15;
+                      float vignette = 1.0 - dot((vUv - 0.5) * 1.3, (vUv - 0.5) * 1.3);
+                      vec3 col = vec3(0.1, 0.6, 0.8) * scanline * vignette + noise * 0.1;
+                      gl_FragColor = vec4(col, 1.0);
+                  }`,
+              toneMapped: false,
+          });
+          islandGroup.userData.screenShader = screenShader;
+          const screen = new Mesh(new PlaneGeometry(48, 36), screenShader);
+          screen.position.z = 23;
+          crtGroup.add(screen);
+
+          // Screen bezel
+          const bezelMat = new MeshStandardMaterial({ color: 0x333333, roughness: 0.5 });
+          const bezelTop = new Mesh(new BoxGeometry(52, 3, 2), bezelMat); bezelTop.position.set(0, 19.5, 23); crtGroup.add(bezelTop);
+          const bezelBot = new Mesh(new BoxGeometry(52, 3, 2), bezelMat); bezelBot.position.set(0, -19.5, 23); crtGroup.add(bezelBot);
+          const bezelL = new Mesh(new BoxGeometry(2, 42, 2), bezelMat); bezelL.position.set(-26, 0, 23); crtGroup.add(bezelL);
+          const bezelR = new Mesh(new BoxGeometry(2, 42, 2), bezelMat); bezelR.position.set(26, 0, 23); crtGroup.add(bezelR);
+
+          // Antenna
+          const antennaMat = new MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.2 });
+          const ant1 = new Mesh(new CylinderGeometry(0.5, 0.3, 35, 6), antennaMat);
+          ant1.position.set(-8, 40, 0); ant1.rotation.z = 0.3; crtGroup.add(ant1);
+          const ant2 = new Mesh(new CylinderGeometry(0.5, 0.3, 35, 6), antennaMat);
+          ant2.position.set(8, 40, 0); ant2.rotation.z = -0.3; crtGroup.add(ant2);
+
+          // Glow around the TV
+          const glowMat = new MeshBasicMaterial({ color: 0x44aacc, transparent: true, opacity: 0.08, blending: AdditiveBlending, depthWrite: false });
+          const glow = new Mesh(new SphereGeometry(70, 16, 8), glowMat);
+          crtGroup.add(glow);
+
+          crtGroup.position.y = 10;
+          crtGroup.rotation.y = random() * Math.PI * 2;
+          islandGroup.add(crtGroup);
+          islandGroup.userData.rotator = crtGroup;
+
       } else if (content.type === 'web') {
-          const cursorGroup = new Group();
-          const cursorMat = new MeshStandardMaterial({ color: 0xeeeeff, emissive: 0xaaaaff, emissiveIntensity: 0.5, transparent: true, opacity: 0.85, side: DoubleSide });
-          const coneGeo = new ConeGeometry(15, 45, 4, 1);
-          coneGeo.translate(0, -22.5, 0);
-          const cone = new Mesh(coneGeo, cursorMat);
-          cone.rotation.y = Math.PI / 4;
-          const shaft = new Mesh(new BoxGeometry(6, 40, 6), cursorMat);
-          shaft.position.y = -35;
-          cursorGroup.add(cone, shaft);
-          cursorGroup.position.y = highestY + 80;
-          cursorGroup.scale.setScalar(1.2);
-          islandGroup.add(cursorGroup);
-          islandGroup.userData.rotator = cursorGroup;
+          // === iMac G3 style floating computer ===
+          radius = 90; islandGroup.userData.radius = radius;
+          const imacGroup = new Group();
+
+          // The iconic translucent shell — bondi blue
+          const shellColor = new Color().setHSL(0.5 + random() * 0.1, 0.7, 0.45);
+          const shellMat = new MeshPhysicalMaterial({
+              color: shellColor, metalness: 0.1, roughness: 0.3,
+              transmission: 0.3, transparent: true, opacity: 0.85,
+              ior: 1.5, thickness: 2.0, clearcoat: 0.8,
+          });
+
+          // Main body — rounded, bulbous back
+          const shellGeo = new SphereGeometry(30, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.6);
+          const shell = new Mesh(shellGeo, shellMat);
+          shell.position.y = -5;
+          shell.rotation.x = Math.PI * 0.15;
+          imacGroup.add(shell);
+
+          // Flat front face
+          const frontMat = new MeshStandardMaterial({ color: 0xdddddd, roughness: 0.3, metalness: 0.1 });
+          const front = new Mesh(new RoundedBoxGeometry(40, 35, 5, 2, 2), frontMat);
+          front.position.set(0, 2, 18);
+          imacGroup.add(front);
+
+          // Screen
+          const screenMat = new MeshStandardMaterial({ color: 0x111111, emissive: shellColor.clone().multiplyScalar(0.5), emissiveIntensity: 1.2, toneMapped: false });
+          const imacScreen = new Mesh(new PlaneGeometry(30, 22), screenMat);
+          imacScreen.position.set(0, 5, 20.6);
+          imacGroup.add(imacScreen);
+
+          // Handle notch on top
+          const handleGeo = new TorusGeometry(5, 1.5, 8, 16, Math.PI);
+          const handle = new Mesh(handleGeo, shellMat);
+          handle.position.set(0, 22, 5);
+          handle.rotation.x = Math.PI;
+          imacGroup.add(handle);
+
+          // Apple logo glow
+          const logoGlow = new Mesh(new SphereGeometry(3, 8, 8), new MeshBasicMaterial({
+              color: shellColor, transparent: true, opacity: 0.3, blending: AdditiveBlending, depthWrite: false,
+          }));
+          logoGlow.position.set(0, 10, -18);
+          imacGroup.add(logoGlow);
+
+          // Soft glow
+          const imacGlow = new Mesh(new SphereGeometry(55, 16, 8), new MeshBasicMaterial({
+              color: shellColor, transparent: true, opacity: 0.06, blending: AdditiveBlending, depthWrite: false,
+          }));
+          imacGroup.add(imacGlow);
+
+          imacGroup.position.y = 15;
+          imacGroup.scale.setScalar(1.2);
+          imacGroup.rotation.y = random() * Math.PI * 2;
+          islandGroup.add(imacGroup);
+          islandGroup.userData.rotator = imacGroup;
+
       } else if (content.type === 'tarot') {
-          const tentGeo = new ConeGeometry(30, 40, 6);
-          const tentMat = new MeshStandardMaterial({ color: 0x4a0d66, emissive: 0x8a2be2, emissiveIntensity: 1.5, side: DoubleSide, transparent: true, opacity: 0.9 });
-          const tent = new Mesh(tentGeo, tentMat);
-          tent.position.y = highestY;
-          islandGroup.add(tent);
-          
-          const glowGeo = new SphereGeometry(35, 16, 8);
-          const glowMat = new MeshBasicMaterial({ color: 0x8a2be2, transparent: true, opacity: 0.2, blending: AdditiveBlending, depthWrite: false });
-          const glow = new Mesh(glowGeo, glowMat);
-          glow.position.y = highestY + 10;
-          islandGroup.add(glow);
+          // === Mystical fountain pen / quill ===
+          radius = 80; islandGroup.userData.radius = radius;
+          const penGroup = new Group();
+
+          const penMat = new MeshPhysicalMaterial({ color: 0x1a0a30, metalness: 0.8, roughness: 0.2, clearcoat: 1.0, clearcoatRoughness: 0.05 });
+          const goldMat = new MeshStandardMaterial({ color: 0xdaa520, metalness: 1.0, roughness: 0.15, emissive: 0x553300, emissiveIntensity: 0.3 });
+
+          // Pen body
+          const barrel = new Mesh(new CylinderGeometry(3, 3, 60, 16), penMat);
+          penGroup.add(barrel);
+
+          // Gold nib
+          const nibGeo = new ConeGeometry(3, 20, 8);
+          const nib = new Mesh(nibGeo, goldMat);
+          nib.position.y = -40;
+          penGroup.add(nib);
+
+          // Gold ring
+          const ring = new Mesh(new TorusGeometry(3.5, 0.8, 8, 32), goldMat);
+          ring.position.y = 25;
+          penGroup.add(ring);
+
+          // Mystical ink drip glow
+          const inkGlow = new Mesh(new SphereGeometry(8, 16, 8), new MeshBasicMaterial({
+              color: 0x8a2be2, transparent: true, opacity: 0.25, blending: AdditiveBlending, depthWrite: false,
+          }));
+          inkGlow.position.y = -50;
+          penGroup.add(inkGlow);
+
+          // Outer mystical aura
+          const aura = new Mesh(new SphereGeometry(45, 16, 8), new MeshBasicMaterial({
+              color: 0x8a2be2, transparent: true, opacity: 0.08, blending: AdditiveBlending, depthWrite: false,
+          }));
+          penGroup.add(aura);
+
+          penGroup.position.y = 40;
+          penGroup.rotation.z = Math.PI * 0.15; // Slight angle like writing
+          penGroup.rotation.y = random() * Math.PI * 2;
+          islandGroup.add(penGroup);
+          islandGroup.userData.rotator = penGroup;
+
       } else if (content.type === 'festival') {
+          // === Festival stage — large glowing structure ===
+          radius = 300; islandGroup.userData.radius = radius;
+
+          // Stage platform
+          const stageMat = new MeshStandardMaterial({ color: 0x1a0a30, emissive: 0x8a2be2, emissiveIntensity: 0.3, roughness: 0.5 });
+          const stage = new Mesh(new CylinderGeometry(150, 180, 20, 32), stageMat);
+          stage.position.y = -5;
+          islandGroup.add(stage);
+
+          // Stage towers
+          const towerMat = new MeshStandardMaterial({ color: 0x333333, emissive: 0x8a2be2, emissiveIntensity: 0.5 });
+          for (let i = 0; i < 4; i++) {
+              const angle = (i / 4) * Math.PI * 2;
+              const tower = new Mesh(new CylinderGeometry(5, 5, 120, 8), towerMat);
+              tower.position.set(Math.cos(angle) * 120, 50, Math.sin(angle) * 120);
+              islandGroup.add(tower);
+
+              // Light on top
+              const lightGeo = new SphereGeometry(8, 8, 8);
+              const lightMat = new MeshBasicMaterial({ color: 0xff44ff, transparent: true, opacity: 0.8, blending: AdditiveBlending });
+              const light = new Mesh(lightGeo, lightMat);
+              light.position.set(Math.cos(angle) * 120, 115, Math.sin(angle) * 120);
+              islandGroup.add(light);
+          }
+
+          // Floating name
           const textSprite = createTextSprite(`${content.data.name} ${content.data.year}`);
-          textSprite.position.y = highestY + 100;
+          textSprite.position.y = 140;
           islandGroup.add(textSprite);
 
-          const glowGeo = new SphereGeometry(radius * 1.1, 32, 16);
-          const glowMat = new MeshBasicMaterial({ color: 0x8a2be2, transparent: true, opacity: 0.15, blending: AdditiveBlending, depthWrite: false });
-          const glow = new Mesh(glowGeo, glowMat);
-          glow.position.y = highestY / 2;
-          islandGroup.add(glow);
+          // Purple aura
+          const festGlow = new Mesh(new SphereGeometry(200, 32, 16), new MeshBasicMaterial({
+              color: 0x8a2be2, transparent: true, opacity: 0.1, blending: AdditiveBlending, depthWrite: false,
+          }));
+          festGlow.position.y = 30;
+          islandGroup.add(festGlow);
       }
+
       return islandGroup;
   }
   
@@ -589,6 +673,7 @@ class GameEngine {
 
   private islandManager!: IslandManager;
   private seaLifeManager!: SeaLifeManager;
+  private nebulaSkybox!: NebulaSkybox;
   
   private gullMessageTimer = 0;
   
@@ -735,12 +820,9 @@ class GameEngine {
     });
     this.water.rotation.x = -Math.PI / 2; this.water.position.y = -0.5; this.scene.add(this.water);
 
-    const cubeTexture = new CubeTextureLoader().load([
-        'https://threejs.org/examples/textures/cube/MilkyWay/dark-s_px.jpg', 'https://threejs.org/examples/textures/cube/MilkyWay/dark-s_nx.jpg',
-        'https://threejs.org/examples/textures/cube/MilkyWay/dark-s_py.jpg', 'https://threejs.org/examples/textures/cube/MilkyWay/dark-s_ny.jpg',
-        'https://threejs.org/examples/textures/cube/MilkyWay/dark-s_pz.jpg', 'https://threejs.org/examples/textures/cube/MilkyWay/dark-s_nz.jpg'
-    ]);
-    this.scene.background = cubeTexture; this.scene.environment = cubeTexture;
+    // Procedural nebula skybox — swirling cosmos
+    this.nebulaSkybox = new NebulaSkybox(this.scene);
+    this.scene.background = null; // Skybox handles its own rendering
     this.createMoons(); this.createSubsurfaceLife();
   }
   
@@ -801,17 +883,26 @@ class GameEngine {
 
   private initSkiff() {
     this.skiff = new Group(); this.skiff.position.y = 5;
-    
-    const bodyMat = new MeshPhysicalMaterial({ color: 0x007a3d, metalness: 0.9, roughness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.05, sheen: 0.5, sheenColor: 0x90ee90, iridescence: 1.0, iridescenceIOR: 1.7, iridescenceThicknessRange: [100, 600] });
-    const glassMat = new MeshPhysicalMaterial({ color: 0x88ccff, metalness: 0.2, roughness: 0, transmission: 1.0, transparent: true, opacity: 0.2, ior: 2.3, thickness: 2.0 });
+
+    // Morris Minor inspired — rounded, lovable, with a glass dome roof
+    const bodyMat = new MeshPhysicalMaterial({ color: 0x2a5a3a, metalness: 0.7, roughness: 0.15, clearcoat: 1.0, clearcoatRoughness: 0.05, sheen: 0.3, sheenColor: 0x90ee90 });
+    const glassMat = new MeshPhysicalMaterial({ color: 0x88ccff, metalness: 0.1, roughness: 0, transmission: 0.9, transparent: true, opacity: 0.25, ior: 1.5, thickness: 1.5 });
     const headlightMat = new MeshStandardMaterial({ emissive: 0xffffdd, emissiveIntensity: 2, color: 0xffffdd, toneMapped: false });
     const brakeLightMat = new MeshStandardMaterial({ emissive: 0xff0000, emissiveIntensity: 0, color: 0xff0000, toneMapped: false });
     const chromeMat = new MeshStandardMaterial({ color: 0xcccccc, metalness: 1.0, roughness: 0.1 });
     const interiorMat = new MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
     const thrusterGlowMat = new MeshStandardMaterial({ emissive: 0x00ffff, emissiveIntensity: 0, color: 0x00ffff, toneMapped: false });
-    
-    const mainBody = new Mesh(new RoundedBoxGeometry(10, 3.5, 22, 2, 1), bodyMat); this.skiff.add(mainBody);
-    const dome = new Mesh(new SphereGeometry(4, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), glassMat); dome.position.set(0, 2.2, 2); this.skiff.add(dome); this.skiffParts.dome = dome;
+
+    // Rounded Morris Minor body — wider, lower, more car-like
+    const mainBody = new Mesh(new RoundedBoxGeometry(12, 4, 24, 2, 1.5), bodyMat); this.skiff.add(mainBody);
+
+    // Glass dome — full hemisphere so you can see the archivist inside
+    const dome = new Mesh(new SphereGeometry(5.5, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.55), glassMat);
+    dome.position.set(0, 2.5, 1); this.skiff.add(dome); this.skiffParts.dome = dome;
+
+    // Dome rim — chrome ring where glass meets body
+    const domeRim = new Mesh(new TorusGeometry(5.5, 0.3, 8, 32), chromeMat);
+    domeRim.rotation.x = -Math.PI / 2; domeRim.position.set(0, 2.5, 1); this.skiff.add(domeRim);
     this.createCockpit(interiorMat);
 
     const beamMaterial = new MeshBasicMaterial({ color: 0xfff2c2, transparent: true, opacity: 0.25, blending: AdditiveBlending, depthWrite: false });
@@ -1023,6 +1114,7 @@ class GameEngine {
   }
   public dispose() {
     this.pause(); this.disposeControls(); this.islandManager?.dispose();
+    this.nebulaSkybox?.dispose();
     this.renderer.dispose(); this.container.removeChild(this.renderer.domElement);
     this.isInitialized = false;
   }
@@ -1059,6 +1151,7 @@ class GameEngine {
     }
     this.updateCamera(delta);
     this.updateWorld(delta, time);
+    this.nebulaSkybox?.update(time, this.skiff.position);
     
     if (this.fishingState === 'idle') {
         this.seaLifeManager.update(delta, time, this.skiffPhysics.speed);
@@ -1242,7 +1335,12 @@ class GameEngine {
     this.water.material.uniforms['time'].value += delta;
     this.water.position.x = this.skiff.position.x;
     this.water.position.z = this.skiff.position.z;
-    
+
+    // Dynamic water color — subtle shifts over time
+    const waterHue = 0.55 + Math.sin(time * 0.01) * 0.03;
+    const waterColor = new Color().setHSL(waterHue, 0.8, 0.03);
+    (this.water.material as ShaderMaterial).uniforms['waterColor'].value.copy(waterColor);
+
     if (this.skiffPhysics.speed > 100 && Math.random() < 0.2) {
         const ripple = this.rippleMeshes.find(r => r.userData.life <= 0);
         if (ripple) {
@@ -1252,12 +1350,18 @@ class GameEngine {
             (ripple.material as MeshBasicMaterial).opacity = 0.6; ripple.scale.set(1,1,1);
         }
     }
-    
+
     this.rippleMeshes.forEach(r => {
         if (r.userData.life > 0) {
             r.userData.life -= delta * 0.8; r.scale.multiplyScalar(1.02); (r.material as MeshBasicMaterial).opacity = r.userData.life * 0.6;
         } else { r.visible = false; }
     });
+
+    // Dynamic fog density — thicker in some areas, thinner in others
+    const fogDensity = 0.00015 + Math.sin(time * 0.005 + this.skiff.position.x * 0.0001) * 0.00005;
+    if (this.fishingState === 'idle') {
+        (this.scene.fog as FogExp2).density = fogDensity;
+    }
   }
 
   private updateSubsurfaceLife(delta: number, time: number) {
