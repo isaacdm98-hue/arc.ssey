@@ -504,6 +504,31 @@ class IslandManager {
           islandGroup.add(festGlow);
       }
 
+      // --- Floating label for all non-festival islands ---
+      if (content.type !== 'festival') {
+          let labelText = '';
+          let labelColor = '#aaffff';
+          if (content.type === 'video') {
+              labelText = content.data.title;
+              labelColor = '#ffcc88'; // warm amber
+          } else if (content.type === 'web') {
+              labelText = content.data.originalUrl;
+              labelColor = '#88ccff'; // soft blue
+          } else if (content.type === 'tarot') {
+              labelText = 'Strange Energy';
+              labelColor = '#cc88ff'; // purple
+          }
+          if (labelText) {
+              const label = createTextSprite(
+                  labelText.length > 30 ? labelText.slice(0, 30) + '...' : labelText,
+                  40,
+                  'VT323'
+              );
+              label.position.y = 70;
+              islandGroup.add(label);
+          }
+      }
+
       return islandGroup;
   }
   
@@ -936,6 +961,24 @@ class GameEngine {
     const fin1 = new Mesh(finGeo, bodyMat); fin1.position.set(-5, 1, 7); fin1.rotation.y = 0.2; this.skiff.add(fin1);
     const fin2 = fin1.clone(); fin2.position.x = 5; fin2.rotation.y = -0.2; this.skiff.add(fin2);
 
+    // Bow lantern — warm amber glow, sways gently
+    const lanternGroup = new Group();
+    const lanternArm = new Mesh(new CylinderGeometry(0.15, 0.15, 4, 6), chromeMat);
+    lanternArm.position.set(0, 2, 0); lanternArm.rotation.z = 0.3;
+    lanternGroup.add(lanternArm);
+    const lanternBody = new Mesh(new CylinderGeometry(0.6, 0.4, 1.5, 8), new MeshStandardMaterial({ color: 0x332200, roughness: 0.7, metalness: 0.3 }));
+    lanternBody.position.set(1.2, 3.5, 0);
+    lanternGroup.add(lanternBody);
+    const lanternGlow = new Mesh(new SphereGeometry(0.8, 8, 6), new MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.7, blending: AdditiveBlending, depthWrite: false }));
+    lanternGlow.position.set(1.2, 3.5, 0);
+    lanternGroup.add(lanternGlow);
+    const lanternHalo = new Mesh(new SphereGeometry(3, 8, 6), new MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.08, blending: AdditiveBlending, depthWrite: false }));
+    lanternHalo.position.set(1.2, 3.5, 0);
+    lanternGroup.add(lanternHalo);
+    lanternGroup.position.set(0, 1, -12);
+    this.skiff.add(lanternGroup);
+    this.skiffParts.lantern = lanternGroup;
+
     const thrusterGroup = new Group();
     const thrusterGlow = new Mesh(new CylinderGeometry(0.9, 0.8, 0.5, 16), thrusterGlowMat); thrusterGlow.position.z = 1.5;
     const t1 = new Group(); t1.add(new Mesh(new CylinderGeometry(1.2, 1, 3, 16), chromeMat), thrusterGlow.clone()); t1.position.set(-2.5, 0, 11); thrusterGroup.add(t1);
@@ -1151,7 +1194,7 @@ class GameEngine {
     }
     this.updateCamera(delta);
     this.updateWorld(delta, time);
-    this.nebulaSkybox?.update(time, this.skiff.position);
+    this.nebulaSkybox?.update(time, this.skiff.position, delta);
     
     if (this.fishingState === 'idle') {
         this.seaLifeManager.update(delta, time, this.skiffPhysics.speed);
@@ -1291,6 +1334,13 @@ class GameEngine {
     p.pitch = MathUtils.lerp(p.pitch, (p.speed / p.maxSpeed) * -0.1, 0.1);
     this.skiff.children[0].rotation.set(p.pitch, 0, p.roll);
     if(this.skiffParts.yoke) (this.skiffParts.yoke as Object3D).rotation.z = p.angularVelocity * -1.2;
+
+    // Lantern sway — gentle spring physics
+    if (this.skiffParts.lantern) {
+        const lantern = this.skiffParts.lantern as Group;
+        lantern.rotation.x = Math.sin(time * 1.8) * 0.08 + p.pitch * 0.5;
+        lantern.rotation.z = Math.sin(time * 1.3 + 0.5) * 0.06 + p.angularVelocity * 0.3;
+    }
 
     ( (this.skiffParts.leftThruster as Group).children[1] as Mesh<any, MeshStandardMaterial>).material.emissiveIntensity = p.leftThrusterPower * 2;
     ( (this.skiffParts.rightThruster as Group).children[1] as Mesh<any, MeshStandardMaterial>).material.emissiveIntensity = p.rightThrusterPower * 2;

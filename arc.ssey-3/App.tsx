@@ -237,6 +237,7 @@ export default function App() {
   }, []);
   
   const handleInit = async () => {
+    // Always advance state — audio is best-effort, never blocks progression
     if (!audioBusRef.current) {
         audioBusRef.current = new AudioBus();
         try {
@@ -244,10 +245,8 @@ export default function App() {
             audioBusRef.current.playAmbient('https://archive.org/download/seaside-ambience/Seaside%20Ambience.mp3');
             audioBusRef.current.loadLoopingSounds();
         } catch(e) {
-            console.error("Audio bus failed to initialize:", e);
-            handleSetSystemMessage("Audio system failed. Please click again.");
-            audioBusRef.current = null; // Reset on failure to allow retry
-            return;
+            console.warn("Audio init issue (non-blocking):", e);
+            // Don't reset audioBusRef — partial init is still useful
         }
     }
     setAppState('intro');
@@ -399,7 +398,7 @@ export default function App() {
     } else {
       threeSceneRef.current?.resume();
     }
-  }, [activeContent, isRadioPanelOpen, isTarotModalOpen, isFishing]);
+  }, [activeContent, isRadioPanelOpen, isTarotModalOpen, isFishing, isJournalOpen]);
   
   const handlePlayStation = (station: ThemedRadioStation | null) => {
     const audioBus = audioBusRef.current;

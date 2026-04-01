@@ -6,7 +6,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { JournalState, JournalEntry } from '../types';
-import { addNote, canExportPDF, exportJournalAsHTML } from '../services/journalService';
+import { addNote, canExportPDF, exportJournalAsHTML, getObliquePrompt } from '../services/journalService';
 
 interface JournalModalProps {
     isOpen: boolean;
@@ -123,7 +123,21 @@ export const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, jou
                                 <p className="text-sm">Your discoveries will be logged here automatically.</p>
                             </div>
                         ) : (
-                            entries.map(entry => <EntryCard key={entry.id} entry={entry} />)
+                            <>
+                            {entries.map(entry => <EntryCard key={entry.id} entry={entry} />)}
+                            {/* Oblique research prompt — appears every 5 entries */}
+                            {(() => {
+                                const prompt = getObliquePrompt(journal.entries.length);
+                                if (!prompt) return null;
+                                return (
+                                    <div className="border-2 border-dashed border-amber-700/50 rounded-lg p-4 my-4 bg-amber-950/20 text-center">
+                                        <p className="text-xs text-amber-600 tracking-widest mb-2">OBLIQUE PROMPT</p>
+                                        <p className="text-amber-300 text-base italic leading-relaxed">"{prompt}"</p>
+                                        <p className="text-xs text-amber-700 mt-2">respond by writing a note below</p>
+                                    </div>
+                                );
+                            })()}
+                            </>
                         )}
                     </div>
 

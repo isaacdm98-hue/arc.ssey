@@ -6,18 +6,19 @@ export class AudioBus {
   private radioAudio: HTMLAudioElement;
   private engineAudio: HTMLAudioElement;
   private proximityAudio: HTMLAudioElement;
-  
+
   private sfxPool: HTMLAudioElement[] = [];
   private sfxPoolIndex = 0;
   private readonly sfxPoolSize = 5;
 
   private isInitialized = false;
+  private ambientVolume = 0.4; // Default ambient volume - gentle, not overpowering
 
   constructor() {
     this.ambientAudio = new Audio();
     this.ambientAudio.crossOrigin = "anonymous";
     this.ambientAudio.loop = true;
-    
+
     this.radioAudio = new Audio();
     this.radioAudio.crossOrigin = "anonymous";
 
@@ -39,56 +40,72 @@ export class AudioBus {
   public async init() {
     if (this.isInitialized) return;
 
+    // Unlock each audio element individually — don't let one failure block all others.
+    // Browser autoplay policies require a user gesture to unlock audio.
     const players = [this.ambientAudio, this.radioAudio, this.engineAudio, this.proximityAudio, ...this.sfxPool];
-    players.forEach(p => { p.src = silentAudioSrc; });
 
-    try {
-      // This "unlock" sequence must be called from within a user gesture.
-      // It plays and immediately pauses each audio element to get it ready for programmatic playback.
-      await Promise.all(players.map(p => p.play()));
-      players.forEach(p => p.pause());
+    let unlocked = 0;
+    for (const p of players) {
+        try {
+            p.src = silentAudioSrc;
+            await p.play();
+            p.pause();
+            unlocked++;
+        } catch {
+            // Individual element failed — continue with the rest
+        }
+    }
 
-      this.isInitialized = true;
-      
-      // Clear the silent src so they are ready for real sources
-      this.radioAudio.src = '';
-      this.sfxPool.forEach(sfx => { sfx.src = '' });
+    // Consider initialized if we unlocked at least the core elements
+    this.isInitialized = unlocked >= 2;
 
-    } catch (error) {
-        console.error("AudioBus initialization failed. User may need to interact with the page again.", error);
-        this.isInitialized = false;
-        throw error;
+    // Clear sources so they're ready for real audio
+    this.radioAudio.src = '';
+    this.sfxPool.forEach(sfx => { sfx.src = ''; });
+
+    if (!this.isInitialized) {
+        console.warn(`AudioBus: only ${unlocked}/${players.length} elements unlocked. Audio may be limited.`);
     }
   }
 
   public playAmbient(url: string) {
     if (!this.isInitialized) return;
     this.ambientAudio.src = url;
-    this.ambientAudio.volume = 1.0;
-    this.ambientAudio.play().catch(e => console.error("Ambient audio playback failed:", e));
+    this.ambientAudio.volume = this.ambientVolume;
+    this.ambientAudio.play().catch(e => console.warn("Ambient audio playback failed:", e));
   }
-  
+
   public loadLoopingSounds() {
       if (!this.isInitialized) return;
+
+      // Engine hum — very subtle low mechanical sound
       this.engineAudio.src = 'https://archive.org/download/scifi-engine-heavy-loop/scifi-engine-heavy-loop.mp3';
-      this.proximityAudio.src = 'https://archive.org/download/MysteriousHum/MysteriousHum.mp3';
       this.engineAudio.volume = 0;
+      this.engineAudio.play().catch(() => {
+          // Fallback: engine audio is optional atmosphere
+          console.warn("Engine audio unavailable — continuing without it");
+      });
+
+      // Proximity hum — subtle sonar-like sound near islands
+      this.proximityAudio.src = 'https://archive.org/download/MysteriousHum/MysteriousHum.mp3';
       this.proximityAudio.volume = 0;
-      this.engineAudio.play().catch(e => console.error("Engine audio loop failed to start:", e));
-      this.proximityAudio.play().catch(e => console.error("Proximity audio loop failed to start:", e));
+      this.proximityAudio.play().catch(() => {
+          console.warn("Proximity audio unavailable — continuing without it");
+      });
   }
 
   public setEngineLevel(level: number) {
-    if (!this.isInitialized || !this.engineAudio) return;
+    if (!this.isInitialized || !this.engineAudio.src) return;
     const clampedLevel = Math.max(0, Math.min(1, level));
-    this.engineAudio.volume = clampedLevel * 0.7;
-    this.engineAudio.playbackRate = 0.8 + clampedLevel * 0.6;
+    // Very subtle — never louder than 0.25
+    this.engineAudio.volume = clampedLevel * 0.25;
+    this.engineAudio.playbackRate = 0.8 + clampedLevel * 0.4;
   }
 
   public setProximityLevel(level: number, type: 'default' | 'festival') {
-    if (!this.isInitialized || !this.proximityAudio) return;
+    if (!this.isInitialized || !this.proximityAudio.src) return;
     const clampedLevel = Math.max(0, Math.min(1, level));
-    const baseVolume = type === 'festival' ? 0.9 : 0.6;
+    const baseVolume = type === 'festival' ? 0.5 : 0.3;
     this.proximityAudio.volume = clampedLevel * baseVolume;
   }
 
@@ -96,13 +113,13 @@ export class AudioBus {
     if (!this.isInitialized) return;
     const sfx = this.sfxPool[this.sfxPoolIndex];
     this.sfxPoolIndex = (this.sfxPoolIndex + 1) % this.sfxPoolSize;
-
+    sfx.volume = 0.3;
     sfx.src = url;
-    sfx.play().catch(e => console.error(`SFX playback failed for ${url}:`, e));
+    sfx.play().catch(() => { /* SFX are optional */ });
   }
-  
+
   public playRadioStream(
-    url: string, 
+    url: string,
     callbacks: {
         onLoadStart: () => void;
         onPlay: () => void;
@@ -118,45 +135,42 @@ export class AudioBus {
     this.radioAudio.onerror = null;
 
     this.radioAudio.onloadstart = callbacks.onLoadStart;
-    this.radioAudio.onplaying = callbacks.onPlay;
+    this.radioAudio.onplaying = () => {
+        callbacks.onPlay();
+        // Duck ambient when radio plays — gentle crossfade
+        this.ambientAudio.volume = this.ambientVolume * 0.3;
+    };
     this.radioAudio.onpause = callbacks.onPause;
-    this.radioAudio.onerror = (e) => {
+    this.radioAudio.onerror = () => {
         const mediaError = this.radioAudio.error;
-        if (mediaError && mediaError.code === mediaError.MEDIA_ERR_ABORTED) {
-            return;
-        }
+        if (mediaError && mediaError.code === mediaError.MEDIA_ERR_ABORTED) return;
         callbacks.onError();
     };
-    
+
     this.radioAudio.src = url;
-    
+    this.radioAudio.volume = 0.6;
+
     this.radioAudio.play().catch(e => {
         if ((e as DOMException).name !== 'AbortError') {
-            console.error("Radio stream playback failed:", e);
+            console.warn("Radio stream playback failed:", e);
             callbacks.onError();
         }
     });
-    
-    this.ambientAudio.volume = 0.2;
   }
 
   public stopRadioStream() {
     if (!this.isInitialized) return;
-
     this.radioAudio.pause();
     this.radioAudio.src = '';
-    
-    this.ambientAudio.volume = 1.0;
+    // Restore ambient volume
+    this.ambientAudio.volume = this.ambientVolume;
   }
 
   public dispose() {
-    this.ambientAudio.pause();
-    this.ambientAudio.src = '';
-    this.radioAudio.pause();
-    this.radioAudio.src = '';
-    this.engineAudio.pause();
-    this.engineAudio.src = '';
-    this.proximityAudio.pause();
-    this.proximityAudio.src = '';
+    [this.ambientAudio, this.radioAudio, this.engineAudio, this.proximityAudio].forEach(a => {
+        a.pause();
+        a.src = '';
+    });
+    this.sfxPool.forEach(sfx => { sfx.pause(); sfx.src = ''; });
   }
 }
