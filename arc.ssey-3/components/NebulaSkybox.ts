@@ -1,18 +1,168 @@
 /**
- * NebulaSkybox.ts — Procedural swirling nebula skybox with alien moons
+ * NebulaSkybox.ts — Procedural swirling nebula skybox with data rain
  * Wind Waker at night meets cosmic ocean. Dynamic, beautiful, alive.
  */
 import {
     Scene, Mesh, ShaderMaterial, BackSide, IcosahedronGeometry,
-    AdditiveBlending, SphereGeometry, MeshBasicMaterial, TextureLoader,
-    Color, Group, Vector3, PointsMaterial, BufferGeometry,
-    Float32BufferAttribute, Points
+    AdditiveBlending, Color, Vector3, PointsMaterial, BufferGeometry,
+    Float32BufferAttribute, Points, LineBasicMaterial, Line,
+    MeshBasicMaterial, SphereGeometry
 } from 'three';
+
+// --- DATA RAIN ---
+// Thin silver lines falling from sky to ocean — the "falling internet remnants"
+interface DataRainDrop {
+    active: boolean;
+    x: number;
+    z: number;
+    y: number;
+    speed: number;
+    length: number;
+    life: number;
+}
+
+class DataRainSystem {
+    private drops: DataRainDrop[] = [];
+    private positions: Float32Array;
+    private points: Points;
+    private readonly maxDrops = 12;
+    private spawnTimer = 0;
+
+    // Small splash particles for when drops hit water
+    private splashPositions: Float32Array;
+    private splashPoints: Points;
+    private splashes: { x: number; z: number; life: number; scale: number }[] = [];
+
+    constructor(scene: Scene) {
+        // Rain streaks rendered as points with large size
+        this.positions = new Float32Array(this.maxDrops * 2 * 3); // top + bottom of each streak
+        const geo = new BufferGeometry();
+        geo.setAttribute('position', new Float32BufferAttribute(this.positions, 3));
+        const mat = new PointsMaterial({
+            color: 0xaaccff,
+            size: 1.5,
+            transparent: true,
+            opacity: 0.6,
+            blending: AdditiveBlending,
+            depthWrite: false,
+            sizeAttenuation: true,
+        });
+        this.points = new Points(geo, mat);
+        scene.add(this.points);
+
+        // Splash particles
+        this.splashPositions = new Float32Array(20 * 3);
+        const splashGeo = new BufferGeometry();
+        splashGeo.setAttribute('position', new Float32BufferAttribute(this.splashPositions, 3));
+        const splashMat = new PointsMaterial({
+            color: 0x88ddff,
+            size: 3,
+            transparent: true,
+            opacity: 0.4,
+            blending: AdditiveBlending,
+            depthWrite: false,
+            sizeAttenuation: true,
+        });
+        this.splashPoints = new Points(splashGeo, splashMat);
+        scene.add(this.splashPoints);
+
+        for (let i = 0; i < this.maxDrops; i++) {
+            this.drops.push({ active: false, x: 0, z: 0, y: 0, speed: 0, length: 0, life: 0 });
+        }
+    }
+
+    update(delta: number, skiffPosition: Vector3) {
+        this.spawnTimer -= delta;
+
+        // Spawn new drops
+        if (this.spawnTimer <= 0) {
+            const drop = this.drops.find(d => !d.active);
+            if (drop) {
+                drop.active = true;
+                drop.x = skiffPosition.x + (Math.random() - 0.5) * 3000;
+                drop.z = skiffPosition.z + (Math.random() - 0.5) * 3000;
+                drop.y = 2000 + Math.random() * 1000;
+                drop.speed = 400 + Math.random() * 300;
+                drop.length = 40 + Math.random() * 60;
+                drop.life = 1;
+            }
+            this.spawnTimer = 0.3 + Math.random() * 0.8; // Spawn every 0.3-1.1s
+        }
+
+        // Update drops
+        for (let i = 0; i < this.maxDrops; i++) {
+            const drop = this.drops[i];
+            const idx = i * 6; // 2 points * 3 components
+            if (drop.active) {
+                drop.y -= drop.speed * delta;
+
+                // Hit water surface
+                if (drop.y <= 0) {
+                    drop.active = false;
+                    // Trigger splash
+                    this.triggerSplash(drop.x, drop.z);
+                }
+
+                // Top of streak
+                this.positions[idx] = drop.x;
+                this.positions[idx + 1] = drop.y + drop.length;
+                this.positions[idx + 2] = drop.z;
+                // Bottom of streak
+                this.positions[idx + 3] = drop.x;
+                this.positions[idx + 4] = drop.y;
+                this.positions[idx + 5] = drop.z;
+            } else {
+                // Hide inactive
+                for (let j = 0; j < 6; j++) this.positions[idx + j] = -99999;
+            }
+        }
+        this.points.geometry.attributes.position.needsUpdate = true;
+
+        // Update splashes
+        let splashIdx = 0;
+        for (let i = this.splashes.length - 1; i >= 0; i--) {
+            const s = this.splashes[i];
+            s.life -= delta * 2;
+            if (s.life <= 0) {
+                this.splashes.splice(i, 1);
+                continue;
+            }
+            s.scale += delta * 30;
+            if (splashIdx < 20) {
+                this.splashPositions[splashIdx * 3] = s.x + Math.cos(splashIdx * 1.2) * s.scale;
+                this.splashPositions[splashIdx * 3 + 1] = s.life * 3;
+                this.splashPositions[splashIdx * 3 + 2] = s.z + Math.sin(splashIdx * 1.2) * s.scale;
+                splashIdx++;
+            }
+        }
+        // Hide unused splash slots
+        for (let i = splashIdx; i < 20; i++) {
+            this.splashPositions[i * 3 + 1] = -99999;
+        }
+        this.splashPoints.geometry.attributes.position.needsUpdate = true;
+    }
+
+    private triggerSplash(x: number, z: number) {
+        for (let i = 0; i < 4; i++) {
+            this.splashes.push({ x, z, life: 1, scale: 0 });
+        }
+    }
+
+    dispose(scene: Scene) {
+        this.points.geometry.dispose();
+        (this.points.material as PointsMaterial).dispose();
+        this.splashPoints.geometry.dispose();
+        (this.splashPoints.material as PointsMaterial).dispose();
+        scene.remove(this.points);
+        scene.remove(this.splashPoints);
+    }
+}
 
 export class NebulaSkybox {
     private skyMesh: Mesh;
     private material: ShaderMaterial;
     private starField: Points;
+    private dataRain: DataRainSystem;
     private scene: Scene;
 
     constructor(scene: Scene) {
@@ -158,6 +308,9 @@ export class NebulaSkybox {
         // Particle star field for extra sparkle
         this.starField = this.createStarField();
         scene.add(this.starField);
+
+        // Data rain — falling internet remnants
+        this.dataRain = new DataRainSystem(scene);
     }
 
     private createStarField(): Points {
@@ -189,13 +342,18 @@ export class NebulaSkybox {
         return new Points(geo, mat);
     }
 
-    update(time: number, skiffPosition: Vector3) {
+    update(time: number, skiffPosition: Vector3, delta?: number) {
         this.material.uniforms.uTime.value = time;
         this.skyMesh.position.copy(skiffPosition);
         this.starField.position.copy(skiffPosition);
         this.skyMesh.rotation.y = time * 0.001;
         this.starField.rotation.y = time * 0.0005;
         this.starField.rotation.x = Math.sin(time * 0.0003) * 0.01;
+
+        // Update data rain
+        if (delta) {
+            this.dataRain.update(delta, skiffPosition);
+        }
     }
 
     dispose() {
@@ -205,5 +363,6 @@ export class NebulaSkybox {
         (this.starField.material as PointsMaterial).dispose();
         this.scene.remove(this.skyMesh);
         this.scene.remove(this.starField);
+        this.dataRain.dispose(this.scene);
     }
 }
