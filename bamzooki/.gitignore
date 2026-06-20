@@ -1,0 +1,10 @@
+# Extracted game data and assets are copyrighted (© BBC / original developers).
+# They are produced locally from YOUR OWN copy of the installer and must NOT be
+# committed to the repository.
+extracted/
+viewer/assets/
+!viewer/assets/.gitkeep
+
+# Never commit the original engine/installer.
+*.exe
+*.dll

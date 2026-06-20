@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>BAMZOOKi — WebGL Reconstruction</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0b0e14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="BAMZOOKi" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+  <style>
+    :root { --bg:#0b0e14; --panel:#141a26; --ink:#e6edf3; --muted:#8b98a8; --acc:#46c7ff;
+            --safe-t:env(safe-area-inset-top); --safe-b:env(safe-area-inset-bottom);
+            --safe-l:env(safe-area-inset-left); --safe-r:env(safe-area-inset-right); }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+                 font:14px/1.5 -apple-system, system-ui, sans-serif;
+                 overscroll-behavior:none; -webkit-text-size-adjust:100%; }
+    body { touch-action:manipulation; }
+    #app { display:grid; grid-template-columns:320px 1fr; height:100%; }
+
+    aside { background:var(--panel); border-right:1px solid #1f2735; overflow:auto;
+            padding:calc(16px + var(--safe-t)) 16px 16px calc(16px + var(--safe-l)); }
+    h1 { font-size:16px; margin:0 0 4px; }
+    .sub { color:var(--muted); font-size:12px; margin-bottom:16px; }
+    .tabs { display:flex; gap:8px; margin-bottom:12px; }
+    .tabs button { flex:1; background:#0e1420; color:var(--ink); border:1px solid #243049;
+                   padding:10px 6px; border-radius:8px; cursor:pointer; font-size:14px; }
+    .tabs button.active { border-color:var(--acc); color:var(--acc); }
+    .btn { width:100%; margin-bottom:12px; background:#0e1420; color:var(--acc);
+           border:1px solid var(--acc); padding:10px; border-radius:8px; cursor:pointer;
+           font-size:14px; }
+    #install { display:none; }
+    #iosHint { display:none; background:#0e1420; border:1px solid #243049; border-radius:8px;
+               padding:10px; font-size:12px; color:var(--muted); margin-bottom:12px; }
+    #iosHint b { color:var(--ink); }
+    #status { font-size:12px; color:var(--muted); margin-top:8px; white-space:pre-wrap; }
+    details { margin-top:12px; } summary { cursor:pointer; color:var(--muted); font-size:12px; }
+    code { color:var(--acc); }
+
+    main { position:relative; min-width:0; }
+    #scene { width:100%; height:100%; display:block; touch-action:none; }
+    #gallery { position:absolute; inset:0; overflow:auto; -webkit-overflow-scrolling:touch;
+               padding:16px calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) 16px;
+               display:none; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+               gap:12px; background:var(--bg); }
+    #gallery.show { display:grid; }
+    .thumb { background:var(--panel); border:1px solid #1f2735; border-radius:8px;
+             padding:8px; text-align:center; }
+    .thumb img { max-width:100%; max-height:96px; image-rendering:pixelated;
+                 background:repeating-conic-gradient(#222 0% 25%, #2a2a2a 0% 50%) 50%/16px 16px; }
+    .thumb span { display:block; font-size:10px; color:var(--muted); margin-top:6px;
+                  word-break:break-all; }
+
+    /* ---- Phone layout: stack, slim top bar, content fills the screen ---- */
+    @media (max-width: 760px) {
+      #app { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+      aside { border-right:none; border-bottom:1px solid #1f2735;
+              padding:calc(10px + var(--safe-t)) calc(12px + var(--safe-r))
+                      10px calc(12px + var(--safe-l)); }
+      h1 { display:inline-block; margin:0 10px 8px 0; }
+      .desktop-only { display:none; }
+      #gallery { grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <h1>BAMZOOKi · WebGL</h1>
+      <div class="sub desktop-only">Bonsai engine reconstruction — phase 1</div>
+      <div class="tabs">
+        <button id="tab-3d" class="active">3D arena</button>
+        <button id="tab-assets">Assets</button>
+      </div>
+      <button id="install" class="btn">⬇ Install app</button>
+      <div id="iosHint">On iPhone: tap <b>Share</b> ⬆ then <b>Add to Home Screen</b> to install.</div>
+      <div id="status">Loading…</div>
+      <details class="desktop-only">
+        <summary>About this build</summary>
+        <p class="sub" style="margin-top:8px">
+          Encrypted <code>.sax</code>/<code>.ssx</code> game logic isn't decryptable
+          yet (roadmap phase 2). This shows the real plaintext assets and a
+          placeholder arena — the seed the engine grows into.
+        </p>
+      </details>
+    </aside>
+    <main>
+      <canvas id="scene"></canvas>
+      <div id="gallery"></div>
+    </main>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                 "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

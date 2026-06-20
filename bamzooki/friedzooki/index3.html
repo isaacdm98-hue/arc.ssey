@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>FriedZooki</title>
+  <meta name="theme-color" content="#fbf5e6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="FriedZooki" />
+  <link rel="stylesheet" href="./theme.css?v=13" />
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <section id="loading" class="screen show center">
+    <div class="logo"><span class="fried">Fried</span>Zooki</div>
+    <p id="boot-step" class="muted">starting…</p>
+    <p id="boot-err" class="small" style="display:none;color:#b14a63;max-width:84vw;word-break:break-word"></p>
+    <span class="verstamp">v13 · emergent physics</span>
+  </section>
+
+  <section id="screen-title" class="screen center">
+    <div class="logo"><span class="fried">Fried</span>Zooki</div>
+    <p class="tag">Build a creature. Tune how it moves. Race it.</p>
+    <div class="menu">
+      <button class="btn-blob" data-go="build">✨ Build a Zook</button>
+      <button class="btn-bubble" data-go="trials">🏁 Trials</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="mute-btn" class="icon-btn">🔊</button>
+      <button id="narrate-btn" class="icon-btn">🗣️</button>
+    </div>
+  </section>
+
+  <section id="screen-build" class="screen">
+    <div class="build-top">
+      <button class="icon-btn" data-go="title">‹</button>
+      <div class="build-name panel"><span>✎</span><input id="build-name" maxlength="14" /></div>
+      <button id="build-new" class="icon-btn">🎲</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="drawer panel dashed">
+      <div class="handle">— tune your Zook —</div>
+      <div id="build-stats" class="build-stats"></div>
+      <div class="swatches" id="build-swatches"></div>
+      <div class="controls" id="build-controls"></div>
+      <div class="build-actions">
+        <button data-go="trials" class="btn-bubble">To Trials</button>
+        <button id="build-test" class="btn-blob">Test ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-trials" class="screen overlay-screen">
+    <div class="bar"><button class="icon-btn" data-go="title">‹</button><h2>Trials</h2><span style="width:52px"></span></div>
+    <p id="trials-zook" class="tag center"></p>
+    <div id="trials-list" class="list"></div>
+  </section>
+
+  <div id="play-ui" class="hidden">
+    <button id="play-back" class="icon-btn play-back">‹</button>
+    <div id="countdown" class="countdown hidden"></div>
+    <div id="hud" class="hud"></div>
+  </div>
+
+  <div id="coach" class="coach hidden">
+    <p id="coach-text"></p>
+    <div class="coach-row"><button id="coach-skip" class="btn-plain">Skip</button><button id="coach-next" class="btn-blob">Got it →</button></div>
+  </div>
+
+  <div id="result" class="modal-wrap">
+    <div class="modal panel">
+      <h2 id="result-title"></h2>
+      <div id="result-metric" class="big-metric"></div>
+      <p id="result-text"></p>
+      <div class="row center" style="justify-content:center">
+        <button id="result-retry" class="btn-blob">Retry</button>
+        <button id="result-trials" class="btn-bubble">Trials</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./friedzooki3.bundle.js?v=13"></script>
+  <script>
+    window.addEventListener("error", (e) => { const el = document.getElementById("boot-err"); if (el) { el.style.display = "block"; el.textContent = "⚠ " + (e.message || "error") + (e.lineno ? " :" + e.lineno : ""); } });
+  </script>
+</body>
+</html>
