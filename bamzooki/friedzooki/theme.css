@@ -163,3 +163,16 @@ input[type=range]{width:100%; accent-color:var(--pink); height:26px;}
 .verstamp{position:fixed; bottom:8px; left:0; right:0; text-align:center; font-size:10px; color:var(--muted); opacity:.4;}
 
 @media (max-width:520px){ .controls{grid-template-columns:1fr;} .drawer{max-height:54vh;} }
+
+/* ---- synth dials (tactile rotary controls) ---- */
+.dials{ display:grid; grid-template-columns:repeat(auto-fit,minmax(76px,1fr)); gap:12px 6px; padding:6px 2px; overflow:auto; }
+.dial{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+.dial-knob{ width:56px; height:56px; border-radius:50%; position:relative; touch-action:none; cursor:grab;
+  background:radial-gradient(circle at 50% 32%, #fffdf6 0%, #efe6cf 70%, #e2d6b8 100%);
+  border:3px solid var(--ink); box-shadow:2px 3px 0 rgba(0,0,0,.14), inset 0 -3px 6px rgba(0,0,0,.10); }
+.dial-knob:active{ cursor:grabbing; }
+.dial-knob::after{ content:""; position:absolute; left:50%; top:5px; width:4px; height:17px; margin-left:-2px;
+  background:var(--orange); border-radius:2px; transform-origin:50% 23px; transform:rotate(var(--a,0deg)); }
+.dial-knob::before{ content:""; position:absolute; inset:6px; border-radius:50%; border:2px dotted rgba(0,0,0,.12); }
+.dial-val{ font-size:14px; color:var(--orange); font-weight:bold; }
+.dial-label{ font-size:11.5px; color:var(--muted); text-align:center; line-height:1.05; max-width:80px; }

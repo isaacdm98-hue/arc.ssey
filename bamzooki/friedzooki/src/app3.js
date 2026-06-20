@@ -69,22 +69,42 @@ const SWATCH = ["#46c7ff", "#e98aa4", "#f0c64a", "#7fae7a", "#ff7a59", "#9d6bff"
 const get = (o, p) => p.split(".").reduce((a, k) => a[k], o);
 const set = (o, p, v) => { const k = p.split("."); const l = k.pop(); k.reduce((a, x) => a[x], o)[l] = v; };
 
+// A tactile synth-style rotary dial. Drag up to turn it up, down to turn it down.
+function makeDial(label, min, max, step, value, onChange) {
+  const wrap = document.createElement("div"); wrap.className = "dial";
+  const knob = document.createElement("div"); knob.className = "dial-knob";
+  const val = document.createElement("div"); val.className = "dial-val";
+  const lab = document.createElement("div"); lab.className = "dial-label"; lab.textContent = label;
+  let v = value, lastSnd = 0;
+  const apply = (nv) => {
+    v = Math.max(min, Math.min(max, Math.round(nv / step) * step));
+    val.textContent = (+v).toFixed(step < 1 ? 2 : 0);
+    knob.style.setProperty("--a", (-135 + ((v - min) / (max - min)) * 270) + "deg");
+  };
+  apply(value);
+  let drag = false, sy = 0, sv = 0;
+  knob.addEventListener("pointerdown", (e) => { drag = true; sy = e.clientY; sv = v; try { knob.setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault(); });
+  knob.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    apply(sv + ((sy - e.clientY) / 150) * (max - min));
+    onChange(v);
+    const now = performance.now(); if (now - lastSnd > 70) { sfx.slide(); lastSnd = now; }
+  });
+  const end = () => { drag = false; };
+  knob.addEventListener("pointerup", end); knob.addEventListener("pointercancel", end);
+  wrap.append(knob, val, lab); return wrap;
+}
+
 function openBuild() {
   showScreen("build"); mode = "build";
   spawnPlayer();
   $("#build-name").value = genome.name;
   const sw = $("#build-swatches"); sw.innerHTML = "";
   for (const c of SWATCH) { const b = document.createElement("button"); b.style.background = c; b.onclick = () => { genome.color = c; sfx.pop(); spawnPlayer(); }; sw.appendChild(b); }
-  const box = $("#build-controls"); box.innerHTML = "";
+  const box = $("#build-controls"); box.className = "dials"; box.innerHTML = "";
   for (const [path, label, min, max, step] of FIELDS) {
-    const row = document.createElement("div"); row.className = "slider-row";
-    const head = document.createElement("div"); head.className = "slider-head";
-    const val = document.createElement("span"); val.className = "v";
-    const inp = document.createElement("input"); inp.type = "range"; inp.min = min; inp.max = max; inp.step = step; inp.value = get(genome, path);
-    val.textContent = (+inp.value).toFixed(step < 1 ? 2 : 0);
-    inp.oninput = () => { const v = parseFloat(inp.value); set(genome, path, v); val.textContent = v.toFixed(step < 1 ? 2 : 0); sfx.slide(); rebuildOrTune(path); updateStats(); };
-    head.append(Object.assign(document.createElement("span"), { textContent: label }), val);
-    row.append(head, inp); box.append(row);
+    box.append(makeDial(label, min, max, step, get(genome, path),
+      (v) => { set(genome, path, v); rebuildOrTune(path); updateStats(); }));
   }
   updateStats();
   maybeCoach();

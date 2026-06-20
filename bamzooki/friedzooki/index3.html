@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#fbf5e6" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="FriedZooki" />
-  <link rel="stylesheet" href="./theme.css?v=12" />
+  <link rel="stylesheet" href="./theme.css?v=13" />
 </head>
 <body>
   <canvas id="scene"></canvas>
@@ -16,7 +16,7 @@
     <div class="logo"><span class="fried">Fried</span>Zooki</div>
     <p id="boot-step" class="muted">starting…</p>
     <p id="boot-err" class="small" style="display:none;color:#b14a63;max-width:84vw;word-break:break-word"></p>
-    <span class="verstamp">v12 · from-scratch engine</span>
+    <span class="verstamp">v13 · emergent physics</span>
   </section>
 
   <section id="screen-title" class="screen center">
@@ -80,7 +80,7 @@
     </div>
   </div>
 
-  <script src="./friedzooki3.bundle.js?v=12"></script>
+  <script src="./friedzooki3.bundle.js?v=13"></script>
   <script>
     window.addEventListener("error", (e) => { const el = document.getElementById("boot-err"); if (el) { el.style.display = "block"; el.textContent = "⚠ " + (e.message || "error") + (e.lineno ? " :" + e.lineno : ""); } });
   </script>

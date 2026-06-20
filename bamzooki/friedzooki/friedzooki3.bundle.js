@@ -301,7 +301,36 @@ void main(){
   }
 
   // src/sim.js
-  var G = 18;
+  var G = 16;
+  var TUNE = {
+    legK: 26,
+    // foot spring stiffness (×mass) — how hard legs push
+    legDamp: 4,
+    // foot velocity damping
+    band: 0.16,
+    // foot is "planted" below this height
+    rightK: 16,
+    // self-righting strength
+    angDamp: 0.9,
+    // angular-velocity damping per step (prevents spin-out)
+    linDamp: 0.995,
+    // linear damping per step
+    steerK: 5,
+    // yaw torque toward goal
+    invI: 1.6,
+    // angular responsiveness (÷mass)
+    maxF: 70
+    // per-leg force cap (×mass)
+  };
+  function legLayout(g) {
+    const n = Math.max(2, Math.min(8, g.legCount | 0)), rows = Math.ceil(n / 2), out = [];
+    for (let i = 0; i < n; i++) {
+      const side = i % 2 === 0 ? -1 : 1, row = i / 2 | 0;
+      const z = rows === 1 ? 0 : g.body.l / 2 - 0.25 - row / (rows - 1) * (g.body.l - 0.5);
+      out.push({ hip: [side * g.body.w / 2, -g.body.h / 2, z], phase: (side < 0 ? 0 : Math.PI) + row * Math.PI, anchor: null });
+    }
+    return out;
+  }
   var Creature = class {
     constructor(genome2) {
       this.set(genome2);
@@ -309,67 +338,99 @@ void main(){
     }
     set(g) {
       this.g = g;
+      this.mass = g.body.mass;
       this.H = g.body.h / 2 + g.leg.len;
-      this.speed = g.gait.drive * 0.34;
-      this.jumpV = Math.max(0, g.gait.jump) * 1.1;
-      this.turn = 6;
       this.r = Math.max(g.body.w, g.body.l) / 2 + 0.1;
+      this.minY = g.body.h / 2 + 0.05;
+      this.legs = legLayout(g);
+      this.legLen = g.leg.len;
+      this.power = 0.6 + g.gait.drive * 0.14;
     }
     reset(x = 0, z = 0, yaw = 0) {
       this.pos = [x, this.H, z];
       this.vel = [0, 0, 0];
-      this.yaw = yaw;
-      this.onGround = true;
-      this.phase = 0;
+      this.quat = Q.fromYaw(yaw);
+      this.angVel = [0, 0, 0];
+      this.phase = Math.random() * 6.28;
       this.goal = null;
       this.idle = false;
+      for (const l of this.legs) l.anchor = null;
+    }
+    up() {
+      return Q.rot(this.quat, [0, 1, 0]);
     }
     forward() {
-      return [Math.sin(this.yaw), 0, Math.cos(this.yaw)];
+      return Q.rot(this.quat, [0, 0, 1]);
     }
     step(dt) {
-      const g = this.g;
+      const g = this.g, q = this.quat, pos = this.pos, m = this.mass;
+      this.phase += dt * g.gait.freq * 6.2832 * (this.idle ? 0.25 : 1);
+      const amp = g.gait.amplitude || 0.7;
+      let F = [0, -G * m, 0], T = [0, 0, 0];
+      const feet = [];
+      const stride = amp * this.legLen * 0.7, liftA = this.legLen * 0.38;
+      for (const leg of this.legs) {
+        const th = this.phase + leg.phase;
+        const lift = Math.max(0, -Math.sin(th)) * liftA;
+        const footLocal = [leg.hip[0], leg.hip[1] - this.legLen + lift, leg.hip[2] + stride * Math.cos(th)];
+        const footW = V.add(pos, Q.rot(q, footLocal));
+        feet.push(footW);
+        if (footW[1] < TUNE.band) {
+          if (!leg.anchor) leg.anchor = [footW[0], 0, footW[2]];
+          const r = V.sub(footW, pos);
+          const footVel = V.add(this.vel, V.cross(this.angVel, r));
+          let legF = V.add(
+            V.scale(V.sub(leg.anchor, footW), TUNE.legK * m * this.power),
+            V.scale(footVel, -TUNE.legDamp * m)
+          );
+          const fm = V.len(legF), cap = TUNE.maxF * m;
+          if (fm > cap) legF = V.scale(legF, cap / fm);
+          F = V.add(F, legF);
+          T = V.add(T, V.cross(r, legF));
+        } else leg.anchor = null;
+      }
+      this.feet = feet;
+      const up = this.up();
+      T = V.add(T, V.scale(V.cross(up, [0, 1, 0]), TUNE.rightK * m));
       let dx, dz;
       if (this.goal) {
-        dx = this.goal[0] - this.pos[0];
-        dz = this.goal[1] - this.pos[2];
+        dx = this.goal[0] - pos[0];
+        dz = this.goal[1] - pos[2];
       } else {
-        const f2 = this.forward();
-        dx = f2[0];
-        dz = f2[2];
+        const f = this.forward();
+        dx = f[0];
+        dz = f[2];
       }
-      const m = Math.hypot(dx, dz) || 1;
-      dx /= m;
-      dz /= m;
-      const want = Math.atan2(dx, dz);
-      let d = want - this.yaw;
-      while (d > Math.PI) d -= 2 * Math.PI;
-      while (d < -Math.PI) d += 2 * Math.PI;
-      this.yaw += Math.max(-this.turn * dt, Math.min(this.turn * dt, d));
-      this.yaw += (g.gait.steer || 0) * dt * 0.4;
-      const target = this.idle ? 0 : this.speed;
-      const f = this.forward();
-      const desired = [f[0] * target, f[2] * target];
-      this.vel[0] += (desired[0] - this.vel[0]) * Math.min(1, dt * 6);
-      this.vel[2] += (desired[1] - this.vel[2]) * Math.min(1, dt * 6);
-      this.vel[1] -= G * dt;
-      this.pos[0] += this.vel[0] * dt;
-      this.pos[1] += this.vel[1] * dt;
-      this.pos[2] += this.vel[2] * dt;
-      if (this.pos[1] <= this.H) {
-        this.pos[1] = this.H;
-        this.vel[1] = 0;
-        this.onGround = true;
-      } else this.onGround = false;
-      const sp = Math.hypot(this.vel[0], this.vel[2]);
-      this.phase += dt * (1.5 + sp * 1.6) * g.gait.freq;
+      const dm = Math.hypot(dx, dz) || 1;
+      dx /= dm;
+      dz /= dm;
+      const fwd = this.forward();
+      let yawErr = Math.atan2(dx, dz) - Math.atan2(fwd[0], fwd[2]);
+      while (yawErr > Math.PI) yawErr -= 6.2832;
+      while (yawErr < -Math.PI) yawErr += 6.2832;
+      T = V.add(T, [0, (yawErr * TUNE.steerK + (g.gait.steer || 0)) * m, 0]);
+      this.vel = V.add(this.vel, V.scale(F, dt / m));
+      this.vel = V.scale(this.vel, TUNE.linDamp);
+      this.pos = V.add(pos, V.scale(this.vel, dt));
+      this.angVel = V.add(this.angVel, V.scale(T, dt * TUNE.invI / m));
+      this.angVel = V.scale(this.angVel, TUNE.angDamp);
+      const wq = [this.angVel[0], this.angVel[1], this.angVel[2], 0];
+      const dq = Q.mul(wq, q);
+      const nq = [q[0] + 0.5 * dq[0] * dt, q[1] + 0.5 * dq[1] * dt, q[2] + 0.5 * dq[2] * dt, q[3] + 0.5 * dq[3] * dt];
+      const ql = Math.hypot(nq[0], nq[1], nq[2], nq[3]) || 1;
+      this.quat = [nq[0] / ql, nq[1] / ql, nq[2] / ql, nq[3] / ql];
+      if (this.pos[1] < this.minY) {
+        this.pos[1] = this.minY;
+        if (this.vel[1] < 0) this.vel[1] = 0;
+      }
     }
     jump() {
-      if (this.onGround) {
-        this.vel[1] = this.jumpV;
-        this.onGround = false;
-      }
+      this.vel[1] += Math.max(0, this.g.gait.jump) * 1.3;
     }
+    upright() {
+      return this.up()[1];
+    }
+    // 1 = perfectly upright, <0 = fallen
   };
   var Body = class {
     constructor(kind, pos, half, mass) {
@@ -379,7 +440,6 @@ void main(){
       this.half = half;
       this.mass = mass;
       this.rest = half[1];
-      this.fallen = 0;
     }
     step(dt) {
       this.vel[1] -= G * dt;
@@ -393,12 +453,9 @@ void main(){
     }
   };
   function pushBody(c, b, dt) {
-    const dx = b.pos[0] - c.pos[0], dz = b.pos[2] - c.pos[2];
-    const dist = Math.hypot(dx, dz) || 1;
-    const reach = c.r + Math.max(b.half[0], b.half[2]);
-    if (dist < reach && Math.abs(b.pos[1] - c.pos[1]) < c.H + b.half[1]) {
-      const nx = dx / dist, nz = dz / dist;
-      const sp = Math.hypot(c.vel[0], c.vel[2]);
+    const dx = b.pos[0] - c.pos[0], dz = b.pos[2] - c.pos[2], dist = Math.hypot(dx, dz) || 1;
+    if (dist < c.r + Math.max(b.half[0], b.half[2]) && Math.abs(b.pos[1] - c.pos[1]) < c.H + b.half[1]) {
+      const nx = dx / dist, nz = dz / dist, sp = Math.hypot(c.vel[0], c.vel[2]);
       const force = (sp + 1.5) * (6 / b.mass);
       b.vel[0] += nx * force * dt * 10;
       b.vel[2] += nz * force * dt * 10;
@@ -406,16 +463,14 @@ void main(){
     }
     return false;
   }
-  function shove(a, b, dt) {
-    const dx = b.pos[0] - a.pos[0], dz = b.pos[2] - a.pos[2];
-    const dist = Math.hypot(dx, dz) || 1;
+  function shove(a, b) {
+    const dx = b.pos[0] - a.pos[0], dz = b.pos[2] - a.pos[2], dist = Math.hypot(dx, dz) || 1;
     if (dist < a.r + b.r) {
-      const nx = dx / dist, nz = dz / dist, overlap = a.r + b.r - dist;
-      const pa = a.speed, pb = b.speed, tot = pa + pb;
-      a.pos[0] -= nx * overlap * (pb / tot);
-      a.pos[2] -= nz * overlap * (pb / tot);
-      b.pos[0] += nx * overlap * (pa / tot);
-      b.pos[2] += nz * overlap * (pa / tot);
+      const nx = dx / dist, nz = dz / dist, overlap = a.r + b.r - dist, tot = a.power + b.power;
+      a.pos[0] -= nx * overlap * (b.power / tot);
+      a.pos[2] -= nz * overlap * (b.power / tot);
+      b.pos[0] += nx * overlap * (a.power / tot);
+      b.pos[2] += nz * overlap * (a.power / tot);
     }
   }
 
@@ -426,19 +481,16 @@ void main(){
       color: "#46c7ff",
       body: { w: 1.3, h: 0.55, l: 1.9, mass: 6 },
       legCount: 4,
-      leg: { len: 0.95, radius: 0.18 },
+      leg: { len: 0.95, radius: 0.16 },
       gait: { freq: 2.2, amplitude: 0.8, drive: 12, jump: 0, steer: 0 },
       records: {}
     };
   }
-  function legHips(g) {
-    const n = Math.max(2, Math.min(8, g.legCount | 0)), rows = Math.ceil(n / 2), out = [];
-    for (let i = 0; i < n; i++) {
-      const side = i % 2 === 0 ? -1 : 1, row = i / 2 | 0;
-      const z = rows === 1 ? 0 : g.body.l / 2 - 0.25 - row / (rows - 1) * (g.body.l - 0.5);
-      out.push({ x: side * g.body.w / 2, z, phase: (side < 0 ? 0 : Math.PI) + row * Math.PI });
-    }
-    return out;
+  function quatFromTo(a, b) {
+    const d = V.dot(a, b);
+    if (d > 0.9999) return [0, 0, 0, 1];
+    if (d < -0.9999) return [1, 0, 0, 0];
+    return Q.fromAxis(V.norm(V.cross(a, b)), Math.acos(Math.max(-1, Math.min(1, d))));
   }
   var Zook3 = class {
     constructor(genome2, renderer, { x = 0, z = 0, yaw = 0, tint = null } = {}) {
@@ -448,12 +500,10 @@ void main(){
       this.sim = new Creature(genome2);
       this.sim.reset(x, z, yaw);
       this.bodyNode = renderer.add("box", this.color, [genome2.body.w / 2, genome2.body.h / 2, genome2.body.l / 2]);
-      this.eyeNode = renderer.add("sphere", "#1c1c1c", [0.11, 0.11, 0.11]);
-      this.legNodes = legHips(genome2).map((h) => ({
-        hip: h,
-        node: renderer.add("box", this.color, [genome2.leg.radius, genome2.leg.len / 2, genome2.leg.radius])
-      }));
-      this.nodes = [this.bodyNode, this.eyeNode, ...this.legNodes.map((l) => l.node)];
+      this.eyeNode = renderer.add("sphere", "#16181d", [0.12, 0.12, 0.12]);
+      this.legNodes = this.sim.legs.map(() => renderer.add("box", shade(this.color), [genome2.leg.radius, 0.1, genome2.leg.radius]));
+      this.nodes = [this.bodyNode, this.eyeNode, ...this.legNodes];
+      this.sim.step(1e-4);
       this.sync();
     }
     get object() {
@@ -464,6 +514,9 @@ void main(){
     }
     height() {
       return this.sim.pos[1];
+    }
+    upright() {
+      return this.sim.upright();
     }
     setGoal(x, z) {
       this.sim.goal = [x, z];
@@ -480,21 +533,21 @@ void main(){
       this.sync();
     }
     sync() {
-      const s = this.sim, g = this.g, yawQ = Q.fromYaw(s.yaw);
+      const s = this.sim, g = this.g, q = s.quat;
       this.bodyNode.pos = s.pos.slice();
-      this.bodyNode.quat = yawQ;
-      const eo = Q.rot(yawQ, [0, g.body.h * 0.2, g.body.l * 0.5]);
-      this.eyeNode.pos = V.add(s.pos, eo);
-      this.eyeNode.quat = yawQ;
-      const L = g.leg.len;
-      for (const l of this.legNodes) {
-        const swing = (g.gait.amplitude || 0.6) * Math.sin(s.phase + l.hip.phase);
-        const legQ = Q.mul(yawQ, Q.fromAxis([1, 0, 0], swing));
-        const hipLocal = [l.hip.x, -g.body.h / 2, l.hip.z];
-        const hipWorld = V.add(s.pos, Q.rot(yawQ, hipLocal));
-        const down = Q.rot(legQ, [0, -L / 2, 0]);
-        l.node.pos = V.add(hipWorld, down);
-        l.node.quat = legQ;
+      this.bodyNode.quat = q;
+      this.eyeNode.pos = V.add(s.pos, Q.rot(q, [0, g.body.h * 0.18, g.body.l * 0.5]));
+      this.eyeNode.quat = q;
+      const feet = s.feet || [];
+      for (let i = 0; i < this.legNodes.length; i++) {
+        const hipW = V.add(s.pos, Q.rot(q, s.legs[i].hip));
+        const footW = feet[i] || hipW;
+        const seg = V.sub(footW, hipW);
+        const len = Math.max(0.05, V.len(seg));
+        const n = this.legNodes[i];
+        n.pos = V.scale(V.add(hipW, footW), 0.5);
+        n.quat = quatFromTo([0, 1, 0], V.scale(seg, 1 / len));
+        n.scale = [g.leg.radius, len / 2, g.leg.radius];
       }
     }
     dispose() {
@@ -502,6 +555,11 @@ void main(){
       this.nodes = [];
     }
   };
+  function shade(hex) {
+    const h = hex.replace("#", "");
+    const f = (i) => Math.max(0, Math.round(parseInt(h.slice(i, i + 2), 16) * 0.82)).toString(16).padStart(2, "0");
+    return "#" + f(0) + f(2) + f(4);
+  }
 
   // src/sound.js
   var ctx = null;
@@ -772,6 +830,52 @@ void main(){
     const l = k.pop();
     k.reduce((a, x) => a[x], o)[l] = v;
   };
+  function makeDial(label, min, max, step, value, onChange) {
+    const wrap = document.createElement("div");
+    wrap.className = "dial";
+    const knob = document.createElement("div");
+    knob.className = "dial-knob";
+    const val = document.createElement("div");
+    val.className = "dial-val";
+    const lab = document.createElement("div");
+    lab.className = "dial-label";
+    lab.textContent = label;
+    let v = value, lastSnd = 0;
+    const apply = (nv) => {
+      v = Math.max(min, Math.min(max, Math.round(nv / step) * step));
+      val.textContent = (+v).toFixed(step < 1 ? 2 : 0);
+      knob.style.setProperty("--a", -135 + (v - min) / (max - min) * 270 + "deg");
+    };
+    apply(value);
+    let drag = false, sy = 0, sv = 0;
+    knob.addEventListener("pointerdown", (e) => {
+      drag = true;
+      sy = e.clientY;
+      sv = v;
+      try {
+        knob.setPointerCapture(e.pointerId);
+      } catch (_) {
+      }
+      e.preventDefault();
+    });
+    knob.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      apply(sv + (sy - e.clientY) / 150 * (max - min));
+      onChange(v);
+      const now = performance.now();
+      if (now - lastSnd > 70) {
+        sfx.slide();
+        lastSnd = now;
+      }
+    });
+    const end = () => {
+      drag = false;
+    };
+    knob.addEventListener("pointerup", end);
+    knob.addEventListener("pointercancel", end);
+    wrap.append(knob, val, lab);
+    return wrap;
+  }
   function openBuild() {
     showScreen("build");
     mode = "build";
@@ -790,32 +894,21 @@ void main(){
       sw.appendChild(b);
     }
     const box = $("#build-controls");
+    box.className = "dials";
     box.innerHTML = "";
     for (const [path, label, min, max, step] of FIELDS) {
-      const row = document.createElement("div");
-      row.className = "slider-row";
-      const head = document.createElement("div");
-      head.className = "slider-head";
-      const val = document.createElement("span");
-      val.className = "v";
-      const inp = document.createElement("input");
-      inp.type = "range";
-      inp.min = min;
-      inp.max = max;
-      inp.step = step;
-      inp.value = get(genome, path);
-      val.textContent = (+inp.value).toFixed(step < 1 ? 2 : 0);
-      inp.oninput = () => {
-        const v = parseFloat(inp.value);
-        set(genome, path, v);
-        val.textContent = v.toFixed(step < 1 ? 2 : 0);
-        sfx.slide();
-        rebuildOrTune(path);
-        updateStats();
-      };
-      head.append(Object.assign(document.createElement("span"), { textContent: label }), val);
-      row.append(head, inp);
-      box.append(row);
+      box.append(makeDial(
+        label,
+        min,
+        max,
+        step,
+        get(genome, path),
+        (v) => {
+          set(genome, path, v);
+          rebuildOrTune(path);
+          updateStats();
+        }
+      ));
     }
     updateStats();
     maybeCoach();
