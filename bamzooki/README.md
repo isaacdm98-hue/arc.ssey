@@ -48,9 +48,25 @@ See [`docs/FORMAT.md`](docs/FORMAT.md) for the full breakdown and
 # 3. Re-run the format analysis on the extracted files (optional)
 python3 tools/analyze.py bamzooki/app
 
-# 4. Open the asset viewer (the current reconstruction seed)
+# 4. (optional) regenerate the app icons — original artwork, no game assets
+python3 tools/make_icons.py
+
+# 5. Open the asset viewer (the current reconstruction seed)
 cd viewer && python3 -m http.server 8000   # then open http://localhost:8000
 ```
+
+### Install as an app (PWA)
+
+The viewer is a **Progressive Web App**: serve `viewer/` over HTTP(S) and your
+browser will offer **"Install app"** (or use the in-app button). Once installed it
+launches full-screen from your home screen and works **offline** — the app shell
+and (after first run) the Three.js modules and your extracted assets are cached by
+the service worker (`viewer/sw.js`). This is what lets it run like a native app on
+phones, tablets, and desktops.
+
+> Note: PWA install/offline requires a real server (HTTP/HTTPS), not `file://`.
+> For install on iOS/Android, the origin must be HTTPS (e.g. GitHub Pages,
+> Netlify, or any static host).
 
 ## Project layout
 

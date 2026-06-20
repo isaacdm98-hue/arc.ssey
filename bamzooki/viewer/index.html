@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>BAMZOOKi — WebGL Reconstruction (Asset Viewer)</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0b0e14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="BAMZOOKi" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <style>
     :root { --bg:#0b0e14; --panel:#141a26; --ink:#e6edf3; --muted:#8b98a8; --acc:#46c7ff; }
     * { box-sizing: border-box; }
@@ -43,6 +50,9 @@
         <button id="tab-3d" class="active">3D arena</button>
         <button id="tab-assets">Assets</button>
       </div>
+      <button id="install" style="display:none;width:100%;margin-bottom:12px;
+              background:#0e1420;color:var(--acc);border:1px solid var(--acc);
+              padding:8px;border-radius:6px;cursor:pointer">⬇ Install app</button>
       <div id="status">Loading…</div>
       <p class="sub" style="margin-top:16px">
         The encrypted <code>.sax</code>/<code>.ssx</code> game logic is not yet

@@ -111,3 +111,27 @@ tabAssets.onclick = () => {
   gallery.classList.add("show");
   tabAssets.classList.add("active"); tab3d.classList.remove("active");
 };
+
+/* -------------------------------------------------------- PWA: SW + install -- */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((e) =>
+      console.warn("SW registration failed:", e));
+  });
+}
+
+let deferredPrompt = null;
+const installBtn = document.getElementById("install");
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "block";
+});
+installBtn.onclick = async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.style.display = "none";
+};
+window.addEventListener("appinstalled", () => { installBtn.style.display = "none"; });
