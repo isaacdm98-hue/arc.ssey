@@ -419,35 +419,27 @@ function copyText(s) {
 function fmt(key, v) { return CONTESTS[key].cls.name === "HighJump" || key === "highjump" ? `${v.toFixed(2)}m` : `${v.toFixed(1)}s`; }
 
 /* ------------------------------------------------------------- startup ---- */
+const bootTimeout = (ms) => new Promise((_, rej) =>
+  setTimeout(() => rej(new Error("Physics took too long to start — tap to reload.")), ms));
 (async () => {
   try {
-    await initPhysics();
+    await Promise.race([initPhysics(), bootTimeout(20000)]);
     $("#loading").classList.remove("show");
     showScreen("title");
   } catch (e) {
     const el = $("#boot-err");
-    if (el) { el.style.display = "block"; el.textContent = "⚠ Couldn't start physics: " + (e.message || e); }
+    if (el) {
+      el.style.display = "block";
+      el.style.cursor = "pointer";
+      el.textContent = "⚠ " + (e.message || e);
+      el.onclick = () => location.reload();
+    }
   }
 })();
 
 /* ---- PWA ---- */
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", async () => {
-    try {
-      const reg = await navigator.serviceWorker.register("./sw.js");
-      reg.addEventListener("updatefound", () => {
-        const nw = reg.installing;
-        nw && nw.addEventListener("statechange", () => {
-          if (nw.state === "installed" && navigator.serviceWorker.controller) nw.postMessage("skipWaiting");
-        });
-      });
-      let reloaded = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (!reloaded) { reloaded = true; location.reload(); }
-      });
-    } catch (_) {}
-  });
-}
+// (No service worker is registered — see the self-heal block in index.html.
+// Keeping it off guarantees the app always loads the latest files.)
 let deferred = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferred = e; $("#install").style.display = "inline-block"; });
 $("#install").onclick = async () => { sfx.pop(); if (deferred) { deferred.prompt(); deferred = null; $("#install").style.display = "none"; } };

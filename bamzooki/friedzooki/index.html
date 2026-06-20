@@ -161,8 +161,13 @@
   </div>
 
   <script>
-    // Belt-and-braces: the play UI must never bleed onto the loading screen,
-    // even if a stale cached script is loaded.
+    // SELF-HEAL: kill any old service worker + caches that may be serving a
+    // stale, broken build (the cause of "stuck forever"). This version uses NO
+    // service worker, so it always loads fresh.
+    if ("serviceWorker" in navigator)
+      navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+    if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
+    // Belt-and-braces: the play UI must never bleed onto the loading screen.
     document.getElementById("play-ui").classList.add("hidden");
     document.getElementById("joy-wrap").classList.add("hidden");
   </script>

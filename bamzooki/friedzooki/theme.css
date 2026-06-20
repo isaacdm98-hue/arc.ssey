@@ -14,11 +14,9 @@ html,body { margin:0; height:100%; overflow:hidden; background:var(--paper);
   color:var(--ink); font-family:"Patrick Hand", system-ui, sans-serif; font-size:17px;
   overscroll-behavior:none; -webkit-text-size-adjust:100%; touch-action:manipulation; }
 
-/* paper grain */
+/* simple flat background tone */
 body::before { content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
-  background:
-    radial-gradient(120% 100% at 50% -10%, #fffdf6 0%, var(--paper) 45%, var(--paper2) 100%);
-}
+  background: var(--paper); }
 #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; display:none; z-index:0; }
 #scene { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; z-index:1; }
 

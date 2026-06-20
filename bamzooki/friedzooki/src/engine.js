@@ -2,9 +2,8 @@
 // the main loop, and AR camera-passthrough background support.
 import * as THREE from "../vendor/three.module.js";
 import { OrbitControls } from "./orbit.js";
-import { skyTexture } from "./textures.js";
 
-const SKY = 0xeef3ea;
+const SKY = 0xe9eef0;   // a simple, calm flat tone
 
 export class Engine {
   constructor(canvas) {
@@ -17,9 +16,8 @@ export class Engine {
 
     this.scene = new THREE.Scene();
     this.skyColor = new THREE.Color(SKY);
-    this.sky = skyTexture();
-    this.scene.background = this.sky || this.skyColor;
-    this.scene.fog = new THREE.Fog(SKY, 45, 140);
+    this.scene.background = this.skyColor;     // simple flat tone
+    this.scene.fog = new THREE.Fog(SKY, 50, 150);
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.05, 500);
     this.camera.position.set(7, 5, 10);
