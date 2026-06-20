@@ -48,7 +48,8 @@ const _fwd = new THREE.Vector3();
 const _up = new THREE.Vector3();
 
 export class Zook {
-  constructor(genome, world, scene, { x = 0, y = null, z = 0, heading = 0, tint = null } = {}) {
+  constructor(genome, world, scene, { x = 0, y = null, z = 0, heading = 0, tint = null, solid = false } = {}) {
+    this.solid = solid;   // Sumo: Zooks must physically push each other
     this.genome = genome;
     this.world = world;
     this.scene = scene;
@@ -80,8 +81,9 @@ export class Zook {
     const vol = g.body.w * (2 * H) * g.body.l;
     const col = RAPIER.ColliderDesc.cuboid(g.body.w / 2, H, g.body.l / 2)
       .setDensity(g.body.mass / vol).setFriction(TUNE.BODY_FRICTION)
-      // Membership bit 1, collide with everything EXCEPT other Zooks (no pile-ups).
-      .setCollisionGroups(0x0002fffd);
+      // Default: collide with everything except other Zooks (no race pile-ups).
+      // Solid (Sumo): collide with everything, so Zooks can shove each other.
+      .setCollisionGroups(this.solid ? 0xffffffff : 0x0002fffd);
     this.world.createCollider(col, this.body);
 
     // --- visuals (children of the group, which tracks the body) ---

@@ -68,6 +68,49 @@ export class Arena {
     return { body, mesh };
   }
 
+  /** A dynamic ball (Football). */
+  sphere(x, y, z, r, mass, color = 0xf2f2f2) {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.5).setAngularDamping(0.4));
+    this.world.createCollider(
+      RAPIER.ColliderDesc.ball(r).setDensity(mass / ((4 / 3) * Math.PI * r ** 3)).setFriction(0.6).setRestitution(0.4), body);
+    this.bodies.push(body);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), this._mat(color));
+    mesh.position.set(x, y, z); mesh.castShadow = true;
+    this._add(mesh);
+    return { body, mesh };
+  }
+
+  /** A static ramp (a slab tilted about X), used by the Assault Course. */
+  ramp(x, y, z, w, len, angle, color = 0x9d6bff) {
+    const q = { x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) };
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z).setRotation(q));
+    this.world.createCollider(RAPIER.ColliderDesc.cuboid(w / 2, 0.12, len / 2).setFriction(1.0), body);
+    this.bodies.push(body);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.24, len), this._mat(color));
+    mesh.position.set(x, y, z); mesh.quaternion.set(q.x, q.y, q.z, q.w);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    this._add(mesh);
+    return mesh;
+  }
+
+  /** A flat ring marker on the ground (Sumo arena edge), no collider. */
+  ring(radius, color = 0xff7a59) {
+    const mesh = new THREE.Mesh(new THREE.RingGeometry(radius - 0.25, radius, 48).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
+    mesh.position.y = 0.02;
+    this._add(mesh);
+    return mesh;
+  }
+
+  /** A goal frame (two posts + crossbar) at z, returns nothing (visual + posts). */
+  goal(z, halfWidth = 3, color = 0x46c7ff) {
+    this.box(-halfWidth, 0.9, z, 0.12, 0.9, 0.12, color);
+    this.box(halfWidth, 0.9, z, 0.12, 0.9, 0.12, color);
+    this.box(0, 1.85, z, halfWidth + 0.12, 0.12, 0.12, color);
+    this.line(z, color, halfWidth * 2);
+  }
+
   /** A coloured visual strip on the ground (start/finish lines), no collider. */
   line(z, color = 0x46c7ff, width = 14) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.4).rotateX(-Math.PI / 2),

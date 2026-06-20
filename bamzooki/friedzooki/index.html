@@ -11,10 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="FriedZooki" />
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Patrick+Hand&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./theme.css?v=7" />
+  <link rel="stylesheet" href="./theme.css?v=8" />
 </head>
 <body>
   <video id="cam" playsinline muted></video>
@@ -27,7 +24,7 @@
     <p class="muted">warming up the physics…</p>
     <p id="boot-hint" class="muted small" style="display:none">Still loading — give it a moment.</p>
     <p id="boot-err" class="small" style="display:none;color:#c0506a;max-width:80vw;word-break:break-word"></p>
-    <span class="verstamp">v7</span>
+    <span class="verstamp">v8</span>
   </section>
 
   <!-- TITLE -->
@@ -40,6 +37,7 @@
       <button class="btn-bubble" data-go="trials">🏁 Trials</button>
       <button class="btn-bubble" data-go="versus">👥 Versus</button>
       <button class="btn-bubble" data-go="online">🌐 Online</button>
+      <button id="btn-champ" class="btn-bubble">🏆 Championship</button>
       <button id="btn-freeroam" class="btn-bubble">🕹 Free Roam</button>
     </div>
     <div class="row" style="margin-top:10px">
@@ -62,6 +60,7 @@
     <div class="spacer"></div>
     <div class="drawer panel dashed">
       <div class="handle">— tune your Zook —</div>
+      <div id="build-stats" class="build-stats"></div>
       <div class="swatches" id="build-swatches"></div>
       <div class="controls" id="build-controls"></div>
       <div class="build-actions">
@@ -171,7 +170,7 @@
   </script>
   <!-- The entire app bundled into ONE classic script (no ES modules, no import
        map, no separate fetches) for maximum compatibility and reliability. -->
-  <script src="./friedzooki.bundle.js?v=7"></script>
+  <script src="./friedzooki.bundle.js?v=8"></script>
   <script>
     // Safety net: if a module fails to load/evaluate, show it instead of hanging
     // forever on "warming up the physics".

@@ -18886,6 +18886,67 @@
       return new _CapsuleGeometry(data.radius, data.length, data.capSegments, data.radialSegments);
     }
   };
+  var RingGeometry = class _RingGeometry extends BufferGeometry {
+    constructor(innerRadius = 0.5, outerRadius = 1, thetaSegments = 32, phiSegments = 1, thetaStart = 0, thetaLength = Math.PI * 2) {
+      super();
+      this.type = "RingGeometry";
+      this.parameters = {
+        innerRadius,
+        outerRadius,
+        thetaSegments,
+        phiSegments,
+        thetaStart,
+        thetaLength
+      };
+      thetaSegments = Math.max(3, thetaSegments);
+      phiSegments = Math.max(1, phiSegments);
+      const indices = [];
+      const vertices = [];
+      const normals = [];
+      const uvs = [];
+      let radius = innerRadius;
+      const radiusStep = (outerRadius - innerRadius) / phiSegments;
+      const vertex2 = new Vector3();
+      const uv = new Vector2();
+      for (let j2 = 0; j2 <= phiSegments; j2++) {
+        for (let i2 = 0; i2 <= thetaSegments; i2++) {
+          const segment = thetaStart + i2 / thetaSegments * thetaLength;
+          vertex2.x = radius * Math.cos(segment);
+          vertex2.y = radius * Math.sin(segment);
+          vertices.push(vertex2.x, vertex2.y, vertex2.z);
+          normals.push(0, 0, 1);
+          uv.x = (vertex2.x / outerRadius + 1) / 2;
+          uv.y = (vertex2.y / outerRadius + 1) / 2;
+          uvs.push(uv.x, uv.y);
+        }
+        radius += radiusStep;
+      }
+      for (let j2 = 0; j2 < phiSegments; j2++) {
+        const thetaSegmentLevel = j2 * (thetaSegments + 1);
+        for (let i2 = 0; i2 < thetaSegments; i2++) {
+          const segment = i2 + thetaSegmentLevel;
+          const a2 = segment;
+          const b2 = segment + thetaSegments + 1;
+          const c2 = segment + thetaSegments + 2;
+          const d2 = segment + 1;
+          indices.push(a2, b2, d2);
+          indices.push(b2, c2, d2);
+        }
+      }
+      this.setIndex(indices);
+      this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+      this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+      this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+    }
+    copy(source) {
+      super.copy(source);
+      this.parameters = Object.assign({}, source.parameters);
+      return this;
+    }
+    static fromJSON(data) {
+      return new _RingGeometry(data.innerRadius, data.outerRadius, data.thetaSegments, data.phiSegments, data.thetaStart, data.thetaLength);
+    }
+  };
   var SphereGeometry = class _SphereGeometry extends BufferGeometry {
     constructor(radius = 1, widthSegments = 32, heightSegments = 16, phiStart = 0, phiLength = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI) {
       super();
@@ -25709,7 +25770,8 @@
   var _fwd = new Vector3();
   var _up = new Vector3();
   var Zook = class {
-    constructor(genome2, world2, scene, { x: x2 = 0, y: y2 = null, z: z2 = 0, heading = 0, tint = null } = {}) {
+    constructor(genome2, world2, scene, { x: x2 = 0, y: y2 = null, z: z2 = 0, heading = 0, tint = null, solid = false } = {}) {
+      this.solid = solid;
       this.genome = genome2;
       this.world = world2;
       this.scene = scene;
@@ -25734,7 +25796,7 @@
       const desc = Og.RigidBodyDesc.dynamic().setTranslation(x2, y2, z2).setRotation(yaw).setLinearDamping(0.1).setAngularDamping(3.5).setCcdEnabled(true);
       this.body = this.world.createRigidBody(desc);
       const vol = g2.body.w * (2 * H2) * g2.body.l;
-      const col = Og.ColliderDesc.cuboid(g2.body.w / 2, H2, g2.body.l / 2).setDensity(g2.body.mass / vol).setFriction(TUNE.BODY_FRICTION).setCollisionGroups(196605);
+      const col = Og.ColliderDesc.cuboid(g2.body.w / 2, H2, g2.body.l / 2).setDensity(g2.body.mass / vol).setFriction(TUNE.BODY_FRICTION).setCollisionGroups(this.solid ? 4294967295 : 196605);
       this.world.createCollider(col, this.body);
       const mat = this._mat(this.color);
       const body = new Mesh(new BoxGeometry(g2.body.w, g2.body.h, g2.body.l), mat);
@@ -25947,6 +26009,53 @@
       mesh.castShadow = true;
       this._add(mesh);
       return { body, mesh };
+    }
+    /** A dynamic ball (Football). */
+    sphere(x2, y2, z2, r2, mass, color = 15921906) {
+      const body = this.world.createRigidBody(
+        Og.RigidBodyDesc.dynamic().setTranslation(x2, y2, z2).setLinearDamping(0.5).setAngularDamping(0.4)
+      );
+      this.world.createCollider(
+        Og.ColliderDesc.ball(r2).setDensity(mass / (4 / 3 * Math.PI * r2 ** 3)).setFriction(0.6).setRestitution(0.4),
+        body
+      );
+      this.bodies.push(body);
+      const mesh = new Mesh(new SphereGeometry(r2, 18, 14), this._mat(color));
+      mesh.position.set(x2, y2, z2);
+      mesh.castShadow = true;
+      this._add(mesh);
+      return { body, mesh };
+    }
+    /** A static ramp (a slab tilted about X), used by the Assault Course. */
+    ramp(x2, y2, z2, w2, len, angle, color = 10316799) {
+      const q2 = { x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) };
+      const body = this.world.createRigidBody(Og.RigidBodyDesc.fixed().setTranslation(x2, y2, z2).setRotation(q2));
+      this.world.createCollider(Og.ColliderDesc.cuboid(w2 / 2, 0.12, len / 2).setFriction(1), body);
+      this.bodies.push(body);
+      const mesh = new Mesh(new BoxGeometry(w2, 0.24, len), this._mat(color));
+      mesh.position.set(x2, y2, z2);
+      mesh.quaternion.set(q2.x, q2.y, q2.z, q2.w);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this._add(mesh);
+      return mesh;
+    }
+    /** A flat ring marker on the ground (Sumo arena edge), no collider. */
+    ring(radius, color = 16743001) {
+      const mesh = new Mesh(
+        new RingGeometry(radius - 0.25, radius, 48).rotateX(-Math.PI / 2),
+        new MeshBasicMaterial({ color, side: DoubleSide })
+      );
+      mesh.position.y = 0.02;
+      this._add(mesh);
+      return mesh;
+    }
+    /** A goal frame (two posts + crossbar) at z, returns nothing (visual + posts). */
+    goal(z2, halfWidth = 3, color = 4638719) {
+      this.box(-halfWidth, 0.9, z2, 0.12, 0.9, 0.12, color);
+      this.box(halfWidth, 0.9, z2, 0.12, 0.9, 0.12, color);
+      this.box(0, 1.85, z2, halfWidth + 0.12, 0.12, 0.12, color);
+      this.line(z2, color, halfWidth * 2);
     }
     /** A coloured visual strip on the ground (start/finish lines), no collider. */
     line(z2, color = 4638719, width = 14) {
@@ -26220,13 +26329,98 @@
       return `BLOCK PUSH \xB7 ${Math.max(0, this.goalZ - this.block.body.translation().z).toFixed(1)}m to the line \xB7 ${this.t.toFixed(1)}s`;
     }
   };
+  var Football = class extends ContestBase {
+    _spawn(p2) {
+      this.name = "Football";
+      this.timeLimit = 40;
+      this.goalZ = 16;
+      this.goalW = 3;
+      this.arena.ground();
+      this.arena.goal(this.goalZ, this.goalW);
+      this.ball = this._dyn(this.arena.sphere(0, 0.6, 6, 0.6, 1));
+      this.player = this._make(p2, { x: 0, z: 0 });
+      this.engine.setFollow(this.player.object);
+    }
+    _ai() {
+      const b2 = this.ball.body.translation();
+      let dx = b2.x - 0, dz = b2.z - this.goalZ;
+      const m2 = Math.hypot(dx, dz) || 1;
+      this.player.setGoal(b2.x + dx / m2 * 1.3, b2.z + dz / m2 * 1.3);
+    }
+    _judge() {
+      const b2 = this.ball.body.translation();
+      if (b2.z >= this.goalZ && Math.abs(b2.x) <= this.goalW)
+        this.finish({ win: true, text: `GOAL in ${this.t.toFixed(1)}s!`, metric: this.t, unit: "s", better: "lower" });
+    }
+    hud() {
+      return `FOOTBALL \xB7 dribble the ball home \xB7 ${this.t.toFixed(1)}s`;
+    }
+  };
+  var Sumo = class extends ContestBase {
+    _spawn(p2) {
+      this.name = "Sumo";
+      this.timeLimit = 25;
+      this.R = 4;
+      this.arena.ground(9416905);
+      this.arena.ring(this.R);
+      const buff = (g2, f2) => {
+        const c2 = structuredClone(g2);
+        c2.gait.drive = Math.max(14, c2.gait.drive) * f2;
+        return c2;
+      };
+      this.player = this._make(buff(p2, 1), { x: 0, z: -2.6, heading: 0, solid: true });
+      this.engine.setFollow(this.player.object, new Vector3(0, 8, -12));
+      const r2 = this._rivalList(p2, 1)[0];
+      this.rival = this._make(buff(r2, 0.82), { x: 0, z: 2.6, heading: Math.PI, tint: r2.color, solid: true });
+    }
+    _ai() {
+      this.player.setGoal(this.rival.position().x, this.rival.position().z);
+      this.rival.setGoal(this.player.position().x, this.player.position().z);
+    }
+    _rad(z2) {
+      const p2 = z2.position();
+      return Math.hypot(p2.x, p2.z);
+    }
+    _out(z2) {
+      return this._rad(z2) > this.R || z2.position().y < 0.3;
+    }
+    _judge() {
+      if (this._out(this.rival)) this.finish({ win: true, text: `Out of the ring in ${this.t.toFixed(1)}s!`, metric: this.t, unit: "s", better: "lower" });
+      else if (this._out(this.player)) this.finish({ win: false, text: "You were shoved out!", metric: null });
+    }
+    _timeoutResult() {
+      const win = this._rad(this.player) <= this._rad(this.rival);
+      return { win, text: win ? "You held the ring!" : "Your rival held firm.", metric: win ? this.t : null, unit: "s", better: "lower" };
+    }
+    hud() {
+      return `SUMO \xB7 shove your rival out \xB7 ${this.t.toFixed(1)}s`;
+    }
+  };
+  var Assault = class extends Sprint {
+    _spawn(p2) {
+      super._spawn(p2);
+      this.name = "Assault Course";
+      this.timeLimit = 40;
+      const zs = [5, 8, 11, 14, 17, 20, 23];
+      zs.forEach((z2, i2) => this._dyn(this.arena.dynamicBar(0, 0.32 + i2 * 0.03, z2, 3.5, 0.32 + i2 * 0.03, 0.06, 0.45)));
+      this.arena.box(-4.2, 0.5, 14, 0.4, 0.5, 9, 10316799);
+      this.arena.box(4.2, 0.5, 14, 0.4, 0.5, 9, 10316799);
+    }
+    hud() {
+      return `ASSAULT \xB7 bowl through the gauntlet \xB7 ${Math.max(0, this.finishZ - this.player.position().z).toFixed(1)}m \xB7 ${this.t.toFixed(1)}s`;
+    }
+  };
   var CONTESTS = {
     sprint: { label: "Sprint", icon: "\u{1F3C3}", desc: "First past the line.", cls: Sprint },
     hurdles: { label: "Hurdles", icon: "\u{1F6A7}", desc: "Sprint and bowl through the bars.", cls: Hurdles },
     lap: { label: "Lap", icon: "\u{1F501}", desc: "A full circuit round the gates.", cls: Lap },
     highjump: { label: "High Jump", icon: "\u2B06\uFE0F", desc: "Tune your spring for max height.", cls: HighJump },
-    blockpush: { label: "Block Push", icon: "\u{1F4E6}", desc: "Shove the block over the line.", cls: BlockPush }
+    blockpush: { label: "Block Push", icon: "\u{1F4E6}", desc: "Shove the block over the line.", cls: BlockPush },
+    football: { label: "Football", icon: "\u26BD", desc: "Dribble the ball into the goal.", cls: Football },
+    sumo: { label: "Sumo", icon: "\u{1F93C}", desc: "Shove your rival out of the ring.", cls: Sumo },
+    assault: { label: "Assault Course", icon: "\u{1F9D7}", desc: "Ramps, walls & bars to the line.", cls: Assault }
   };
+  var CHAMPIONSHIP = ["sprint", "hurdles", "highjump", "football", "sumo", "blockpush", "assault", "lap"];
   function makeContest(key, playerGenome, world2, scene, engine2, opts = {}) {
     return new CONTESTS[key].cls(playerGenome, world2, scene, engine2, opts);
   }
@@ -26790,6 +26984,7 @@
   var netTheirs = null;
   var netState = null;
   var netAccum = 0;
+  var champ = null;
   function teardown() {
     if (ar.active) toggleAR(false);
     if (contest) {
@@ -26916,10 +27111,11 @@
     const c2 = CONTESTS[trialKey];
     let rec = { improved: false };
     if (r2.metric != null) rec = recordResult(player.name, trialKey, r2.metric, r2.better);
+    $2("#result-retry").textContent = "Retry";
+    $2("#result-trials").textContent = "Trials";
     $2("#result-title").textContent = r2.win ? "\u{1F3C6} Winner!" : "Nice try!";
     $2("#result-metric").textContent = r2.metric != null ? `${r2.metric.toFixed(r2.unit === "m" ? 2 : 1)}${r2.unit}` + (rec.improved ? "  \u2B50 new best!" : "") : "";
     $2("#result-text").textContent = r2.text;
-    $2("#result").classList.add("show");
     if (r2.win) {
       sfx.win();
       confetti();
@@ -26928,6 +27124,17 @@
       sfx.lose();
       narrator.say("So close. Tweak your Zook and have another go.");
     }
+    if (champ) {
+      const pts = r2.place ? { 1: 10, 2: 6, 3: 3 }[r2.place] || 1 : r2.win ? 10 : 3;
+      champ.score += pts;
+      champ.i++;
+      const last = champ.i >= CHAMPIONSHIP.length;
+      $2("#result-title").textContent = `${c2.label}: +${pts} pts`;
+      $2("#result-metric").textContent = `Championship \xB7 ${champ.score} pts \xB7 ${Math.min(champ.i, CHAMPIONSHIP.length)}/${CHAMPIONSHIP.length}`;
+      $2("#result-retry").textContent = last ? "See result \u25B6" : "Next trial \u25B6";
+      $2("#result-trials").textContent = "Quit";
+    }
+    $2("#result").classList.add("show");
   }
   function showScreen(name) {
     for (const el3 of document.querySelectorAll(".screen")) el3.classList.remove("show");
@@ -27151,9 +27358,45 @@
     $2("#build-name").value = genome.name;
     renderControls($2("#build-controls"), $2("#build-swatches"), genome, (structural) => {
       if (structural) rebuildPlayer();
+      updateBuildStats();
     });
+    updateBuildStats();
     narrator.say("Welcome to the workshop. Slide the controls and watch your Zook spring to life.");
   }
+  function updateBuildStats() {
+    const g2 = genome;
+    const top = (g2.gait.drive * 0.34).toFixed(1);
+    $2("#build-stats").innerHTML = `<span>\u2696\uFE0F ${g2.body.mass.toFixed(1)}</span><span>\u{1F9B5} ${g2.legCount}</span><span>\u{1F4AA} ${g2.gait.drive}</span><span>\u{1F3C3} ${top} m/s</span><span>\u2B06\uFE0F ${g2.gait.jump}</span>`;
+  }
+  function startChampionship() {
+    champ = { i: 0, score: 0, done: false };
+    narrator.say("The Championship! Eight trials to crown the greatest Zook.");
+    nextChampTrial();
+  }
+  function nextChampTrial() {
+    if (!champ) return;
+    if (champ.i >= CHAMPIONSHIP.length) return showChampFinal();
+    showScreen("play");
+    startContest(CHAMPIONSHIP[champ.i]);
+  }
+  function showChampFinal() {
+    champ.done = true;
+    const s2 = champ.score;
+    const rank = s2 >= 64 ? "\u{1F3C6} Legendary Champion" : s2 >= 46 ? "\u{1F947} Champion" : s2 >= 30 ? "\u{1F948} Contender" : "\u{1F396} Plucky Underdog";
+    $2("#result-title").textContent = rank;
+    $2("#result-metric").textContent = `${s2} points`;
+    $2("#result-text").textContent = `${genome.name} finished the Championship!`;
+    $2("#result-retry").textContent = "Play again";
+    $2("#result-trials").textContent = "Menu";
+    $2("#result").classList.add("show");
+    sfx.win();
+    confetti();
+    narrator.say(`The Championship is done. ${genome.name} scores ${s2} points!`);
+  }
+  $2("#btn-champ").onclick = () => {
+    sfx.whoosh();
+    startChampionship();
+  };
   $2("#build-name").oninput = (e2) => {
     genome.name = e2.target.value || "Zook";
   };
@@ -27281,11 +27524,19 @@
   };
   $2("#play-back").onclick = () => {
     sfx.back();
+    champ = null;
     showScreen("title");
   };
   $2("#result-retry").onclick = () => {
     sfx.pop();
     $2("#result").classList.remove("show");
+    if (champ) {
+      if (champ.done) {
+        champ = null;
+        startChampionship();
+      } else nextChampTrial();
+      return;
+    }
     if (netRole && net.connected) {
       showScreen("online");
       netMaybeReady();
@@ -27297,6 +27548,11 @@
   $2("#result-trials").onclick = () => {
     sfx.tap();
     $2("#result").classList.remove("show");
+    if (champ) {
+      champ = null;
+      showScreen("title");
+      return;
+    }
     if (netRole && net.connected) {
       showScreen("online");
       netMaybeReady();

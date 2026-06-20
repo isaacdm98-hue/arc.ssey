@@ -7,7 +7,7 @@ import { Engine } from "./engine.js";
 import { initPhysics, createWorld } from "./physics.js";
 import { Zook, defaultGenome } from "./zook.js";
 import { Arena } from "./arena.js";
-import { CONTESTS, makeContest } from "./contests.js";
+import { CONTESTS, CHAMPIONSHIP, makeContest } from "./contests.js";
 import { renderControls } from "./builder.js";
 import { loadRoster, upsert, remove, recordResult } from "./storage.js";
 import { ARSession } from "./ar.js";
@@ -38,6 +38,7 @@ let world = null, arena = null, player = null, contest = null;
 let trialKey = null;
 let versusPair = null;      // { a, b } genomes when in hotseat Versus
 let netRole = null, netMine = null, netTheirs = null, netState = null, netAccum = 0;
+let champ = null;           // { i, score, done } during a Championship run
 
 /* ----------------------------------------------------------- session mgmt -- */
 function teardown() {
@@ -149,14 +150,25 @@ function finishContest() {
   const c = CONTESTS[trialKey];
   let rec = { improved: false };
   if (r.metric != null) rec = recordResult(player.name, trialKey, r.metric, r.better);
+  $("#result-retry").textContent = "Retry"; $("#result-trials").textContent = "Trials";
   $("#result-title").textContent = r.win ? "🏆 Winner!" : "Nice try!";
   $("#result-metric").textContent = r.metric != null
     ? `${r.metric.toFixed(r.unit === "m" ? 2 : 1)}${r.unit}` + (rec.improved ? "  ⭐ new best!" : "")
     : "";
   $("#result-text").textContent = r.text;
-  $("#result").classList.add("show");
   if (r.win) { sfx.win(); confetti(); narrator.say(rec.improved ? "A brand new record! Magnificent." : "A win! Beautifully done."); }
   else { sfx.lose(); narrator.say("So close. Tweak your Zook and have another go."); }
+
+  if (champ) {
+    const pts = r.place ? ({ 1: 10, 2: 6, 3: 3 }[r.place] || 1) : (r.win ? 10 : 3);
+    champ.score += pts; champ.i++;
+    const last = champ.i >= CHAMPIONSHIP.length;
+    $("#result-title").textContent = `${c.label}: +${pts} pts`;
+    $("#result-metric").textContent = `Championship · ${champ.score} pts · ${Math.min(champ.i, CHAMPIONSHIP.length)}/${CHAMPIONSHIP.length}`;
+    $("#result-retry").textContent = last ? "See result ▶" : "Next trial ▶";
+    $("#result-trials").textContent = "Quit";
+  }
+  $("#result").classList.add("show");
 }
 
 /* --------------------------------------------------------------- screens -- */
@@ -314,9 +326,44 @@ function openBuild() {
   $("#build-name").value = genome.name;
   renderControls($("#build-controls"), $("#build-swatches"), genome, (structural) => {
     if (structural) rebuildPlayer();
+    updateBuildStats();
   });
+  updateBuildStats();
   narrator.say("Welcome to the workshop. Slide the controls and watch your Zook spring to life.");
 }
+function updateBuildStats() {
+  const g = genome;
+  const top = (g.gait.drive * 0.34).toFixed(1);
+  $("#build-stats").innerHTML =
+    `<span>⚖️ ${g.body.mass.toFixed(1)}</span><span>🦵 ${g.legCount}</span>` +
+    `<span>💪 ${g.gait.drive}</span><span>🏃 ${top} m/s</span><span>⬆️ ${g.gait.jump}</span>`;
+}
+
+/* ---- Championship ---- */
+function startChampionship() {
+  champ = { i: 0, score: 0, done: false };
+  narrator.say("The Championship! Eight trials to crown the greatest Zook.");
+  nextChampTrial();
+}
+function nextChampTrial() {
+  if (!champ) return;
+  if (champ.i >= CHAMPIONSHIP.length) return showChampFinal();
+  showScreen("play"); startContest(CHAMPIONSHIP[champ.i]);
+}
+function showChampFinal() {
+  champ.done = true;
+  const s = champ.score;
+  const rank = s >= 64 ? "🏆 Legendary Champion" : s >= 46 ? "🥇 Champion" : s >= 30 ? "🥈 Contender" : "🎖 Plucky Underdog";
+  $("#result-title").textContent = rank;
+  $("#result-metric").textContent = `${s} points`;
+  $("#result-text").textContent = `${genome.name} finished the Championship!`;
+  $("#result-retry").textContent = "Play again";
+  $("#result-trials").textContent = "Menu";
+  $("#result").classList.add("show");
+  sfx.win(); confetti();
+  narrator.say(`The Championship is done. ${genome.name} scores ${s} points!`);
+}
+$("#btn-champ").onclick = () => { sfx.whoosh(); startChampionship(); };
 $("#build-name").oninput = (e) => { genome.name = e.target.value || "Zook"; };
 $("#build-new").onclick = () => { sfx.pop(); genome = defaultGenome("Zook " + (loadRoster().length + 1)); openBuild(); };
 $("#build-save").onclick = () => { sfx.save(); upsert(structuredClone(genome)); flash($("#build-save"), "Saved!"); };
@@ -383,14 +430,16 @@ async function toggleAR(force) {
 }
 $("#ar-btn").onclick = () => { sfx.tap(); toggleAR(); };
 $("#recenter-btn").onclick = () => { sfx.tap(); ar.recenter(); };
-$("#play-back").onclick = () => { sfx.back(); showScreen("title"); };
+$("#play-back").onclick = () => { sfx.back(); champ = null; showScreen("title"); };
 $("#result-retry").onclick = () => {
   sfx.pop(); $("#result").classList.remove("show");
+  if (champ) { if (champ.done) { champ = null; startChampionship(); } else nextChampTrial(); return; }
   if (netRole && net.connected) { showScreen("online"); netMaybeReady(); return; }
   if (versusPair) startVersus(trialKey, versusPair.a, versusPair.b); else startContest(trialKey);
 };
 $("#result-trials").onclick = () => {
   sfx.tap(); $("#result").classList.remove("show");
+  if (champ) { champ = null; showScreen("title"); return; }
   if (netRole && net.connected) { showScreen("online"); netMaybeReady(); return; }
   showScreen(versusPair ? "versus" : "trials");
 };

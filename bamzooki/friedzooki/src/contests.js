@@ -183,13 +183,84 @@ class BlockPush extends ContestBase {
   hud() { return `BLOCK PUSH · ${Math.max(0, this.goalZ - this.block.body.translation().z).toFixed(1)}m to the line · ${this.t.toFixed(1)}s`; }
 }
 
+/* ------------------------------------------------------------- Football --- */
+class Football extends ContestBase {
+  _spawn(p) {
+    this.name = "Football"; this.timeLimit = 40; this.goalZ = 16; this.goalW = 3;
+    this.arena.ground(); this.arena.goal(this.goalZ, this.goalW);
+    this.ball = this._dyn(this.arena.sphere(0, 0.6, 6, 0.6, 1.0));
+    this.player = this._make(p, { x: 0, z: 0 });
+    this.engine.setFollow(this.player.object);
+  }
+  _ai() {
+    // Dribble: approach the ball from the side away from the goal, pushing it in.
+    const b = this.ball.body.translation();
+    let dx = b.x - 0, dz = b.z - this.goalZ; const m = Math.hypot(dx, dz) || 1;
+    this.player.setGoal(b.x + (dx / m) * 1.3, b.z + (dz / m) * 1.3);
+  }
+  _judge() {
+    const b = this.ball.body.translation();
+    if (b.z >= this.goalZ && Math.abs(b.x) <= this.goalW)
+      this.finish({ win: true, text: `GOAL in ${this.t.toFixed(1)}s!`, metric: this.t, unit: "s", better: "lower" });
+  }
+  hud() { return `FOOTBALL · dribble the ball home · ${this.t.toFixed(1)}s`; }
+}
+
+/* ---------------------------------------------------------------- Sumo ----- */
+class Sumo extends ContestBase {
+  _spawn(p) {
+    this.name = "Sumo"; this.timeLimit = 25; this.R = 4;
+    this.arena.ground(0x8fb0c9); this.arena.ring(this.R);
+    const buff = (g, f) => { const c = structuredClone(g); c.gait.drive = Math.max(14, c.gait.drive) * f; return c; };
+    this.player = this._make(buff(p, 1), { x: 0, z: -2.6, heading: 0, solid: true });
+    this.engine.setFollow(this.player.object, new THREE.Vector3(0, 8, -12));
+    const r = this._rivalList(p, 1)[0];
+    this.rival = this._make(buff(r, 0.82), { x: 0, z: 2.6, heading: Math.PI, tint: r.color, solid: true });
+  }
+  _ai() {
+    this.player.setGoal(this.rival.position().x, this.rival.position().z);
+    this.rival.setGoal(this.player.position().x, this.player.position().z);
+  }
+  _rad(z) { const p = z.position(); return Math.hypot(p.x, p.z); }
+  _out(z) { return this._rad(z) > this.R || z.position().y < 0.3; }
+  _judge() {
+    if (this._out(this.rival)) this.finish({ win: true, text: `Out of the ring in ${this.t.toFixed(1)}s!`, metric: this.t, unit: "s", better: "lower" });
+    else if (this._out(this.player)) this.finish({ win: false, text: "You were shoved out!", metric: null });
+  }
+  _timeoutResult() {
+    const win = this._rad(this.player) <= this._rad(this.rival);   // nearer the centre dominates
+    return { win, text: win ? "You held the ring!" : "Your rival held firm.", metric: win ? this.t : null, unit: "s", better: "lower" };
+  }
+  hud() { return `SUMO · shove your rival out · ${this.t.toFixed(1)}s`; }
+}
+
+/* ----------------------------------------------------------- Assault ------ */
+class Assault extends Sprint {
+  _spawn(p) {
+    super._spawn(p); this.name = "Assault Course"; this.timeLimit = 40;
+    // A long gauntlet of knockable bars at rising heights — all traversable.
+    const zs = [5, 8, 11, 14, 17, 20, 23];
+    zs.forEach((z, i) => this._dyn(this.arena.dynamicBar(0, 0.32 + i * 0.03, z, 3.5, 0.32 + i * 0.03, 0.06, 0.45)));
+    // decorative side walls, well clear of the centre lane
+    this.arena.box(-4.2, 0.5, 14, 0.4, 0.5, 9, 0x9d6bff);
+    this.arena.box(4.2, 0.5, 14, 0.4, 0.5, 9, 0x9d6bff);
+  }
+  hud() { return `ASSAULT · bowl through the gauntlet · ${Math.max(0, this.finishZ - this.player.position().z).toFixed(1)}m · ${this.t.toFixed(1)}s`; }
+}
+
 export const CONTESTS = {
   sprint: { label: "Sprint", icon: "🏃", desc: "First past the line.", cls: Sprint },
   hurdles: { label: "Hurdles", icon: "🚧", desc: "Sprint and bowl through the bars.", cls: Hurdles },
   lap: { label: "Lap", icon: "🔁", desc: "A full circuit round the gates.", cls: Lap },
   highjump: { label: "High Jump", icon: "⬆️", desc: "Tune your spring for max height.", cls: HighJump },
   blockpush: { label: "Block Push", icon: "📦", desc: "Shove the block over the line.", cls: BlockPush },
+  football: { label: "Football", icon: "⚽", desc: "Dribble the ball into the goal.", cls: Football },
+  sumo: { label: "Sumo", icon: "🤼", desc: "Shove your rival out of the ring.", cls: Sumo },
+  assault: { label: "Assault Course", icon: "🧗", desc: "Ramps, walls & bars to the line.", cls: Assault },
 };
+
+/** Order used for the Championship ladder. */
+export const CHAMPIONSHIP = ["sprint", "hurdles", "highjump", "football", "sumo", "blockpush", "assault", "lap"];
 
 export function makeContest(key, playerGenome, world, scene, engine, opts = {}) {
   return new CONTESTS[key].cls(playerGenome, world, scene, engine, opts);
