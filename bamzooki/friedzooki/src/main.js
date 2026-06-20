@@ -431,8 +431,23 @@ function fmt(key, v) { return CONTESTS[key].cls.name === "HighJump" || key === "
 })();
 
 /* ---- PWA ---- */
-if ("serviceWorker" in navigator)
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const reg = await navigator.serviceWorker.register("./sw.js");
+      reg.addEventListener("updatefound", () => {
+        const nw = reg.installing;
+        nw && nw.addEventListener("statechange", () => {
+          if (nw.state === "installed" && navigator.serviceWorker.controller) nw.postMessage("skipWaiting");
+        });
+      });
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!reloaded) { reloaded = true; location.reload(); }
+      });
+    } catch (_) {}
+  });
+}
 let deferred = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferred = e; $("#install").style.display = "inline-block"; });
 $("#install").onclick = async () => { sfx.pop(); if (deferred) { deferred.prompt(); deferred = null; $("#install").style.display = "none"; } };

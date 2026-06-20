@@ -160,6 +160,12 @@
     </div>
   </div>
 
+  <script>
+    // Belt-and-braces: the play UI must never bleed onto the loading screen,
+    // even if a stale cached script is loaded.
+    document.getElementById("play-ui").classList.add("hidden");
+    document.getElementById("joy-wrap").classList.add("hidden");
+  </script>
   <script type="module" src="./src/main.js"></script>
   <script>
     // Safety net: if a module fails to load/evaluate, show it instead of hanging
