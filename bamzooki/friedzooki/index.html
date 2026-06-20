@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>FriedZooki</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#fbf7ec" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FriedZooki" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Patrick+Hand&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <video id="cam" playsinline muted></video>
+  <canvas id="scene"></canvas>
+
+  <!-- Loading -->
+  <section id="loading" class="screen show center">
+    <div class="logo"><span class="fried">Fried</span>Zooki</div>
+    <p class="muted">warming up the physics…</p>
+  </section>
+
+  <!-- TITLE -->
+  <section id="screen-title" class="screen">
+    <div class="logo"><span class="fried">Fried</span>Zooki</div>
+    <p class="tag">Build a creature. Tune how it moves. Race it on your desk.</p>
+    <div class="menu">
+      <button class="btn-blob" data-go="build">🛠 Workshop</button>
+      <button class="btn-bubble" data-go="roster">📋 My Zooks</button>
+      <button class="btn-bubble" data-go="trials">🏁 Trials</button>
+      <button class="btn-bubble" data-go="versus">👥 Versus</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="mute-btn" class="icon-btn">🔊</button>
+      <button id="install" class="btn-plain" style="display:none">⬇ Install</button>
+    </div>
+    <p id="ios-hint" class="muted small" style="display:none">On iPhone: <b>Share ⬆ → Add to Home Screen</b></p>
+  </section>
+
+  <!-- BUILD / WORKSHOP (Zook stays visible on stage) -->
+  <section id="screen-build" class="screen">
+    <div class="build-top">
+      <button id="build-back" class="icon-btn" data-go="title">‹</button>
+      <div class="build-name panel dashed">
+        <span>✎</span><input id="build-name" maxlength="14" />
+      </div>
+      <button id="build-new" class="icon-btn">🎲</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="drawer panel dashed">
+      <div class="handle">— tune your Zook —</div>
+      <div class="swatches" id="build-swatches"></div>
+      <div class="controls" id="build-controls"></div>
+      <div class="build-actions">
+        <button id="build-save" class="btn-bubble">Save</button>
+        <button id="build-test" class="btn-blob">Test ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROSTER -->
+  <section id="screen-roster" class="screen overlay-screen">
+    <div class="bar"><button class="icon-btn" data-go="title">‹</button><h2>My Zooks</h2><span style="width:54px"></span></div>
+    <div id="roster-list" class="list"></div>
+  </section>
+
+  <!-- TRIALS -->
+  <section id="screen-trials" class="screen overlay-screen">
+    <div class="bar"><button class="icon-btn" data-go="title">‹</button><h2>Trials</h2><span style="width:54px"></span></div>
+    <p id="trials-zook" class="tag center"></p>
+    <div id="trials-list" class="list"></div>
+  </section>
+
+  <!-- VERSUS (local hotseat: two Zooks, one device) -->
+  <section id="screen-versus" class="screen overlay-screen">
+    <div class="bar"><button class="icon-btn" data-go="title">‹</button><h2>Versus</h2><span style="width:54px"></span></div>
+    <p class="tag center">Two Zooks, one device — pass &amp; play head-to-head.</p>
+    <div class="list">
+      <div class="panel"><div class="row" style="justify-content:space-between"><b>🟦 Player 1</b><select id="vs-a" class="vs-select"></select></div></div>
+      <div class="panel"><div class="row" style="justify-content:space-between"><b>🟥 Player 2</b><select id="vs-b" class="vs-select"></select></div></div>
+      <p class="tag center">pick a race</p>
+      <div id="vs-trials" class="row center" style="justify-content:center;flex-wrap:wrap;gap:10px"></div>
+      <p id="vs-warn" class="muted center small"></p>
+    </div>
+  </section>
+
+  <!-- PLAY (HUD over the live 3D / AR) -->
+  <div id="play-ui" class="hidden">
+    <div class="play-top">
+      <button id="play-back" class="icon-btn">‹</button>
+      <div class="right">
+        <button id="recenter-btn" class="btn-plain hidden">⌖ Recentre</button>
+        <button id="ar-btn" class="btn-plain">📷 AR</button>
+      </div>
+    </div>
+    <div id="countdown" class="countdown hidden"></div>
+    <div id="hud" class="hud"></div>
+  </div>
+
+  <!-- RESULT MODAL -->
+  <div id="result" class="modal-wrap">
+    <div class="modal panel">
+      <h2 id="result-title"></h2>
+      <div id="result-metric" class="big-metric"></div>
+      <p id="result-text"></p>
+      <div class="row center" style="justify-content:center">
+        <button id="result-retry" class="btn-blob">Retry</button>
+        <button id="result-trials" class="btn-bubble">Trials</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.14.0"
+    }
+  }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
