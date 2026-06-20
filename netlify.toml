@@ -1,0 +1,17 @@
+# Netlify config for the BAMZOOKi WebGL reconstruction PWA.
+# The app's index.html lives in bamzooki/viewer/, so publish from there.
+[build]
+  publish = "bamzooki/viewer"
+  command = ""
+
+# Make sure the service worker and manifest are served fresh and with the
+# right content types (so the PWA installs and updates correctly).
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
