@@ -35,6 +35,8 @@
       <button class="btn-bubble" data-go="roster">📋 My Zooks</button>
       <button class="btn-bubble" data-go="trials">🏁 Trials</button>
       <button class="btn-bubble" data-go="versus">👥 Versus</button>
+      <button class="btn-bubble" data-go="online">🌐 Online</button>
+      <button id="btn-freeroam" class="btn-bubble">🕹 Free Roam</button>
     </div>
     <div class="row" style="margin-top:10px">
       <button id="mute-btn" class="icon-btn">🔊</button>
@@ -90,6 +92,41 @@
     </div>
   </section>
 
+  <!-- ONLINE (peer-to-peer over WebRTC, serverless) -->
+  <section id="screen-online" class="screen overlay-screen">
+    <div class="bar"><button class="icon-btn" data-go="title">‹</button><h2>Online</h2><span style="width:54px"></span></div>
+    <p class="tag center">Two phones, peer-to-peer — no servers.</p>
+    <div class="list">
+      <div class="panel"><div class="row" style="justify-content:space-between"><b>Your Zook</b><select id="net-zook" class="vs-select"></select></div></div>
+      <div class="row center" style="justify-content:center;gap:10px">
+        <button id="net-host" class="btn-blob">Host</button>
+        <button id="net-join" class="btn-bubble">Join</button>
+      </div>
+      <div id="net-host-panel" class="panel dashed" style="display:none">
+        <b>1 · Send this invite</b>
+        <textarea id="net-offer" class="code" readonly></textarea>
+        <button id="net-offer-copy" class="btn-plain">Copy invite</button>
+        <b>2 · Paste their reply</b>
+        <textarea id="net-reply-in" class="code" placeholder="paste reply code here"></textarea>
+        <button id="net-host-connect" class="btn-blob">Connect</button>
+      </div>
+      <div id="net-join-panel" class="panel dashed" style="display:none">
+        <b>1 · Paste the invite</b>
+        <textarea id="net-offer-in" class="code" placeholder="paste invite code here"></textarea>
+        <button id="net-join-gen" class="btn-blob">Make reply</button>
+        <b>2 · Send this reply back</b>
+        <textarea id="net-reply" class="code" readonly></textarea>
+        <button id="net-reply-copy" class="btn-plain">Copy reply</button>
+      </div>
+      <p id="net-status" class="muted center"></p>
+      <div id="net-start" class="panel" style="display:none">
+        <b id="net-ready" class="center" style="display:block"></b>
+        <div id="net-trials" class="row center" style="justify-content:center;flex-wrap:wrap;gap:10px"></div>
+        <p id="net-waiting" class="muted center" style="display:none">Waiting for the host to start…</p>
+      </div>
+    </div>
+  </section>
+
   <!-- PLAY (HUD over the live 3D / AR) -->
   <div id="play-ui" class="hidden">
     <div class="play-top">
@@ -101,6 +138,10 @@
     </div>
     <div id="countdown" class="countdown hidden"></div>
     <div id="hud" class="hud"></div>
+    <div id="joy-wrap" class="hidden">
+      <div id="joy-base"><div id="joy-knob"></div></div>
+      <button id="jump-btn">JUMP</button>
+    </div>
   </div>
 
   <!-- RESULT MODAL -->

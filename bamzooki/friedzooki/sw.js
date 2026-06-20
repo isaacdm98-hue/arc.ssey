@@ -6,6 +6,7 @@ const SHELL = [
   "./src/main.js", "./src/engine.js", "./src/physics.js", "./src/zook.js",
   "./src/arena.js", "./src/contests.js", "./src/builder.js", "./src/storage.js",
   "./src/ar.js", "./src/sound.js", "./src/fx.js",
+  "./src/net.js", "./src/joystick.js",
   "./assets/frame-green.png", "./assets/frame-dashed.png",
   "./assets/blob-yellow.png", "./assets/bubble-pink.png",
   "./icons/icon-192.png", "./icons/icon-512.png",

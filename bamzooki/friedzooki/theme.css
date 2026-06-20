@@ -125,6 +125,23 @@ input[type=range]{ width:100%; accent-color:var(--pink); height:26px; }
   text-shadow:4px 5px 0 #fff, 8px 10px 0 #0002; animation:pop .6s ease both; }
 @keyframes pop { 0%{transform:scale(.3); opacity:0} 50%{transform:scale(1.15); opacity:1} 100%{transform:scale(1)} }
 
+/* ---- free-roam joystick + jump ---- */
+#joy-wrap { position:absolute; left:0; right:0; bottom:calc(24px + var(--sb));
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 calc(26px + var(--sl)) 0 calc(26px + var(--sr)); pointer-events:none; }
+#joy-base { width:120px; height:120px; border-radius:50%; background:#fff6; border:3px solid var(--ink);
+  position:relative; pointer-events:auto; touch-action:none; }
+#joy-knob { width:54px; height:54px; border-radius:50%; background:var(--pink); border:3px solid var(--ink);
+  position:absolute; left:50%; top:50%; margin:-27px 0 0 -27px; transition:transform .03s; }
+#jump-btn { pointer-events:auto; width:96px; height:96px; border-radius:50%;
+  background:url("./assets/blob-yellow.png") center/100% 100% no-repeat; font-size:20px; }
+
+/* ---- code textareas (online signalling) ---- */
+.code { width:100%; min-height:64px; font-family:monospace; font-size:11px; resize:vertical;
+  border:2px solid var(--ink); border-radius:10px; padding:8px; background:#fff8; margin:4px 0 8px;
+  word-break:break-all; }
+#net-host-panel b, #net-join-panel b { display:block; margin-top:6px; }
+
 /* ---- result modal ---- */
 .modal-wrap { position:fixed; inset:0; z-index:8; display:none; align-items:center; justify-content:center;
   background:#0003; padding:18px; }

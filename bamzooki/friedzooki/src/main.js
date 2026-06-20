@@ -13,17 +13,22 @@ import { loadRoster, upsert, remove, recordResult } from "./storage.js";
 import { ARSession } from "./ar.js";
 import { sfx, toggleMute, primeAudio } from "./sound.js";
 import { confetti } from "./fx.js";
+import { Net } from "./net.js";
+import { Joystick } from "./joystick.js";
 
 const $ = (s) => document.querySelector(s);
 const canvas = $("#scene");
 const engine = new Engine(canvas);
 const ar = new ARSession(engine, $("#cam"));
+const net = new Net();
+const joystick = new Joystick($("#joy-base"), $("#joy-knob"));
 
 let genome = defaultGenome("My First Zook");
-let mode = "idle";          // idle | sandbox | countdown | contest
+let mode = "idle";          // idle | sandbox | freeroam | countdown | contest | net-host | net-client
 let world = null, arena = null, player = null, contest = null;
 let trialKey = null;
 let versusPair = null;      // { a, b } genomes when in hotseat Versus
+let netRole = null, netMine = null, netTheirs = null, netState = null, netAccum = 0;
 
 /* ----------------------------------------------------------- session mgmt -- */
 function teardown() {
@@ -73,10 +78,30 @@ function startVersus(key, gA, gB) {
 /* --------------------------------------------------------------- loop ----- */
 engine.onFrame((dt, t) => {
   if (mode === "sandbox" && player) { player.update(t); world.step(); player.sync(); }
+  else if (mode === "freeroam" && player) {
+    const idle = !(joystick.x || joystick.y);
+    if (!idle) player.driveDir(joystick.x, joystick.y); else player.clearGoal();
+    player.update(t, idle); world.step(); player.sync();
+  }
   else if (mode === "contest" && contest) {
     contest.step(dt);
     $("#hud").textContent = contest.hud();
     if (contest.done) finishContest();
+  }
+  else if (mode === "net-host" && contest) {
+    contest.step(dt);
+    $("#hud").textContent = contest.hud();
+    netAccum += dt;
+    if (netAccum >= 1 / 20) { net.send({ t: "state", s: contest.serialize() }); netAccum = 0; }
+    if (contest.done) {
+      const winner = contest.result.win ? netMine.name : netTheirs.name;
+      net.send({ t: "state", s: contest.serialize() });
+      net.send({ t: "result", winner });
+      mode = "idle"; showNetResult(winner);
+    }
+  }
+  else if (mode === "net-client" && contest) {
+    if (netState) { contest.applyState(netState); $("#hud").textContent = netState.h || ""; }
   }
 });
 
@@ -126,11 +151,120 @@ function showScreen(name) {
   for (const el of document.querySelectorAll(".screen")) el.classList.remove("show");
   const playing = name === "play";
   $("#play-ui").classList.toggle("hidden", !playing);
+  $("#joy-wrap").classList.add("hidden");      // shown again only by Free Roam
   if (!playing) { teardown(); engine.setOrbit(); }
   const el = $("#screen-" + name); if (el) el.classList.add("show");
   if (name === "roster") renderRoster();
   if (name === "trials") renderTrials();
   if (name === "versus") renderVersus();
+  if (name === "online") renderOnline();
+}
+
+/* ---- Free Roam (manual touch drive) ---- */
+function startFreeRoam() {
+  teardown();
+  world = createWorld();
+  arena = new Arena(world, engine.scene);
+  arena.ground(0x6f9b6a);
+  for (let i = 0; i < 6; i++) arena.box((Math.random() * 2 - 1) * 12, 0.6, (Math.random() * 2 - 1) * 12, 0.6, 0.6, 0.6, 0xffb454);
+  player = new Zook(genome, world, engine.scene, { x: 0, z: 0 });
+  engine.setFollow(player.object, new THREE.Vector3(0, 5, -9));
+  mode = "freeroam";
+  showScreen("play");
+  $("#joy-wrap").classList.remove("hidden");
+  $("#hud").textContent = "Free Roam — drive with the stick, tap JUMP!";
+}
+$("#btn-freeroam").onclick = () => { sfx.whoosh(); startFreeRoam(); };
+$("#jump-btn").onclick = () => { if (player) player.jump(); sfx.pop(); };
+
+/* ---- Online (WebRTC) ---- */
+function renderOnline() {
+  const list = loadRoster();
+  const sel = $("#net-zook");
+  sel.innerHTML = list.length
+    ? list.map((g) => `<option value="${g.name}">${g.name}</option>`).join("")
+    : `<option value="">(save a Zook first)</option>`;
+  $("#net-host-panel").style.display = "none";
+  $("#net-join-panel").style.display = "none";
+  $("#net-start").style.display = "none";
+  $("#net-status").textContent = "";
+}
+function netPickGenome() {
+  const name = $("#net-zook").value;
+  const g = loadRoster().find((z) => z.name === name);
+  return structuredClone(g || genome);
+}
+function netStatus(s) { $("#net-status").textContent = s; }
+
+$("#net-host").onclick = async () => {
+  sfx.tap(); netRole = "host"; netMine = netPickGenome();
+  $("#net-host-panel").style.display = "block"; $("#net-join-panel").style.display = "none";
+  netStatus("Creating invite…");
+  try { $("#net-offer").value = await net.host(); netStatus("Share the invite, then paste their reply."); }
+  catch (e) { netStatus("Couldn't start: " + e.message); }
+};
+$("#net-join").onclick = () => {
+  sfx.tap(); netRole = "join"; netMine = netPickGenome();
+  $("#net-join-panel").style.display = "block"; $("#net-host-panel").style.display = "none";
+  netStatus("Paste the invite, then make your reply.");
+};
+$("#net-join-gen").onclick = async () => {
+  const code = $("#net-offer-in").value.trim(); if (!code) return netStatus("Paste the invite first.");
+  try { $("#net-reply").value = await net.join(code); netStatus("Send your reply back to the host."); }
+  catch (e) { netStatus("Bad invite code."); }
+};
+$("#net-host-connect").onclick = async () => {
+  const code = $("#net-reply-in").value.trim(); if (!code) return netStatus("Paste their reply first.");
+  try { await net.hostAccept(code); netStatus("Connecting…"); } catch (e) { netStatus("Bad reply code."); }
+};
+$("#net-offer-copy").onclick = () => { copyText($("#net-offer").value); netStatus("Invite copied!"); };
+$("#net-reply-copy").onclick = () => { copyText($("#net-reply").value); netStatus("Reply copied!"); };
+
+net.onOpen = () => { netStatus("Connected! 🎉"); net.send({ t: "hello", genome: netMine }); };
+net.onClose = () => { netStatus("Disconnected."); };
+net.onMessage = (m) => {
+  if (m.t === "hello") { netTheirs = m.genome; netMaybeReady(); }
+  else if (m.t === "start") { startNetClient(m.key, m.host, m.guest); }
+  else if (m.t === "state") { netState = m.s; }
+  else if (m.t === "result") { mode = "idle"; showNetResult(m.winner); }
+};
+function netMaybeReady() {
+  if (!netMine || !netTheirs) return;
+  $("#net-start").style.display = "block";
+  $("#net-ready").textContent = `${netMine.name}  vs  ${netTheirs.name}`;
+  const box = $("#net-trials"); box.innerHTML = "";
+  if (netRole === "host") {
+    $("#net-waiting").style.display = "none";
+    for (const key of ["sprint", "hurdles", "lap"]) {
+      box.appendChild(mkbtn(`${CONTESTS[key].icon} ${CONTESTS[key].label}`, "btn-blob", () => {
+        net.send({ t: "start", key, host: netMine, guest: netTheirs });
+        startNetHost(key, netMine, netTheirs);
+      }));
+    }
+  } else { $("#net-waiting").style.display = "block"; }
+}
+function startNetHost(key, hostG, guestG) {
+  teardown(); trialKey = key; netRole = "host"; netMine = hostG; netTheirs = guestG;
+  world = createWorld();
+  contest = makeContest(key, hostG, world, engine.scene, engine, { opponents: [guestG] });
+  engine.setFollow(contest.zooks[0].object);
+  mode = "net-host"; netAccum = 0; sfx.whoosh();
+  showScreen("play"); runCountdown();
+}
+function startNetClient(key, hostG, guestG) {
+  teardown(); trialKey = key;
+  world = createWorld();
+  contest = makeContest(key, hostG, world, engine.scene, engine, { opponents: [guestG] });
+  engine.setFollow(contest.zooks[1] ? contest.zooks[1].object : contest.zooks[0].object);
+  mode = "net-client"; netState = null; sfx.whoosh();
+  showScreen("play"); runCountdown();
+}
+function showNetResult(winner) {
+  $("#result-title").textContent = `🏆 ${winner} wins!`;
+  $("#result-metric").textContent = "";
+  $("#result-text").textContent = `${CONTESTS[trialKey].label} · online`;
+  $("#result").classList.add("show");
+  if (netMine && winner === netMine.name) { sfx.win(); confetti(); } else sfx.lose();
 }
 
 /* ---- Versus (local hotseat) ---- */
@@ -232,11 +366,13 @@ $("#recenter-btn").onclick = () => { sfx.tap(); ar.recenter(); };
 $("#play-back").onclick = () => { sfx.back(); showScreen("title"); };
 $("#result-retry").onclick = () => {
   sfx.pop(); $("#result").classList.remove("show");
+  if (netRole && net.connected) { showScreen("online"); netMaybeReady(); return; }
   if (versusPair) startVersus(trialKey, versusPair.a, versusPair.b); else startContest(trialKey);
 };
 $("#result-trials").onclick = () => {
-  sfx.tap(); const back = versusPair ? "versus" : "trials";
-  $("#result").classList.remove("show"); showScreen(back);
+  sfx.tap(); $("#result").classList.remove("show");
+  if (netRole && net.connected) { showScreen("online"); netMaybeReady(); return; }
+  showScreen(versusPair ? "versus" : "trials");
 };
 
 /* ---- nav + chrome ---- */
@@ -250,6 +386,10 @@ document.body.addEventListener("pointerdown", () => primeAudio(), { once: true }
 function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
 function mkbtn(text, cls, fn) { const b = el("button", cls); b.textContent = text; b.onclick = () => { sfx.tap(); fn(); }; return b; }
 function flash(b, t) { const o = b.textContent; b.textContent = t; setTimeout(() => (b.textContent = o), 1100); }
+function copyText(s) {
+  if (navigator.clipboard) navigator.clipboard.writeText(s).catch(() => {});
+  else { const ta = document.createElement("textarea"); ta.value = s; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (_) {} ta.remove(); }
+}
 function fmt(key, v) { return CONTESTS[key].cls.name === "HighJump" || key === "highjump" ? `${v.toFixed(2)}m` : `${v.toFixed(1)}s`; }
 
 /* ------------------------------------------------------------- startup ---- */

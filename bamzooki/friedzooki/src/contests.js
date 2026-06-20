@@ -63,6 +63,18 @@ class ContestBase {
     if (!this.done && this.t > this.timeLimit) this.finish(this._timeoutResult());
   }
   finish(result) { this.done = true; this.result = result; }
+
+  /** Host → client: pack every rendered transform + clock into a compact frame. */
+  serialize() {
+    const T = (o) => [o.position.x, o.position.y, o.position.z, o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w];
+    return { z: this.zooks.map((z) => T(z.group)), d: this.dynamics.map((d) => T(d.mesh)), t: this.t, h: this.hud() };
+  }
+  /** Client: apply a host frame (no local physics; legs animate from the clock). */
+  applyState(s) {
+    s.z.forEach((a, i) => { const z = this.zooks[i]; if (z) { z.setNetTransform(a); z.animateLegs(s.t); } });
+    s.d.forEach((a, i) => { const d = this.dynamics[i]; if (d) { d.mesh.position.set(a[0], a[1], a[2]); d.mesh.quaternion.set(a[3], a[4], a[5], a[6]); } });
+    this.t = s.t;
+  }
   hud() { return ""; }
   _ai() {}
   _judge() {}

@@ -107,7 +107,7 @@ export class Zook {
     }
   }
 
-  update(t) {
+  update(t, idle = false) {
     const { gait } = this.genome;
     const mass = this.genome.body.mass;
     const tb = this.body;
@@ -150,7 +150,7 @@ export class Zook {
     tb.addTorque({ x: 0, y: (dyaw * 1.4 + steerBias - av.y * 0.4) * mass, z: 0 }, true);
 
     // Forward muscle drive toward the travel direction: speed-targeted, capped.
-    if (gait.drive && moveFactor > 0) {
+    if (gait.drive && moveFactor > 0 && !idle) {
       const v = tb.linvel();
       const fwdSpeed = v.x * dx + v.z * dz;
       const accel = Math.max(0, gait.drive * TUNE.SPEED_K - fwdSpeed);
@@ -170,17 +170,35 @@ export class Zook {
       }
     }
 
-    // Animate the legs (cosmetic): fore-aft swing, lifting on the forward stroke.
-    for (const lp of this.legPivots) {
-      const s = Math.sin(2 * Math.PI * gait.freq * t + lp.phase);
-      lp.pivot.rotation.x = (gait.amplitude || 0.6) * s;
-    }
+    this.animateLegs(t);
+  }
+
+  /** Cosmetic leg swing — derived purely from the clock, so a networked client
+   *  can animate legs locally without running physics. */
+  animateLegs(t) {
+    const g = this.genome.gait;
+    for (const lp of this.legPivots)
+      lp.pivot.rotation.x = (g.amplitude || 0.6) * Math.sin(2 * Math.PI * g.freq * t + lp.phase);
+  }
+
+  /** Apply a networked transform to the rendered group (client side). */
+  setNetTransform(a) {
+    this.group.position.set(a[0], a[1], a[2]);
+    this.group.quaternion.set(a[3], a[4], a[5], a[6]);
   }
 
   /** Seek a world point; the drive/yaw in update() handles the rest. */
   steerToward(px, pz) { this.goal = { x: px, z: pz }; }
   setGoal(px, pz) { this.goal = { x: px, z: pz }; }
   clearGoal() { this.goal = null; }
+  /** Manual drive: aim toward a heading vector (for the Free Roam joystick). */
+  driveDir(dx, dz) { this.goal = { x: this.body.translation().x + dx * 50, z: this.body.translation().z + dz * 50 }; }
+  /** Manual jump (Free Roam button) — only when grounded. */
+  jump() {
+    const m = this.genome.body.mass;
+    if (this.body.translation().y < this.H + 0.15)
+      this.body.applyImpulse({ x: 0, y: Math.max(6, this.genome.gait.jump || 6) * m, z: 0 }, true);
+  }
 
   sync() {
     const p = this.body.translation();
