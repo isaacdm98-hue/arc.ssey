@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BAMZOOKi — WebGL Reconstruction (Asset Viewer)</title>
+  <style>
+    :root { --bg:#0b0e14; --panel:#141a26; --ink:#e6edf3; --muted:#8b98a8; --acc:#46c7ff; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+                 font:14px/1.5 system-ui, sans-serif; }
+    #app { display:grid; grid-template-columns: 320px 1fr; height:100%; }
+    aside { background:var(--panel); border-right:1px solid #1f2735; padding:16px;
+            overflow:auto; }
+    h1 { font-size:16px; margin:0 0 4px; }
+    .sub { color:var(--muted); font-size:12px; margin-bottom:16px; }
+    .tabs { display:flex; gap:8px; margin-bottom:12px; }
+    .tabs button { flex:1; background:#0e1420; color:var(--ink); border:1px solid #243049;
+                   padding:6px; border-radius:6px; cursor:pointer; }
+    .tabs button.active { border-color:var(--acc); color:var(--acc); }
+    #status { font-size:12px; color:var(--muted); margin-top:8px; white-space:pre-wrap; }
+    main { position:relative; }
+    #scene { width:100%; height:100%; display:block; }
+    #gallery { position:absolute; inset:0; overflow:auto; padding:16px;
+               display:none; grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+               gap:12px; background:var(--bg); }
+    #gallery.show { display:grid; }
+    .thumb { background:var(--panel); border:1px solid #1f2735; border-radius:8px;
+             padding:8px; text-align:center; }
+    .thumb img { max-width:100%; max-height:96px; image-rendering:pixelated;
+                 background:repeating-conic-gradient(#222 0% 25%, #2a2a2a 0% 50%) 50%/16px 16px; }
+    .thumb span { display:block; font-size:10px; color:var(--muted); margin-top:6px;
+                  word-break:break-all; }
+    code { color:var(--acc); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <h1>BAMZOOKi · WebGL</h1>
+      <div class="sub">Bonsai engine reconstruction — phase 1 (asset viewer)</div>
+      <div class="tabs">
+        <button id="tab-3d" class="active">3D arena</button>
+        <button id="tab-assets">Assets</button>
+      </div>
+      <div id="status">Loading…</div>
+      <p class="sub" style="margin-top:16px">
+        The encrypted <code>.sax</code>/<code>.ssx</code> game logic is not yet
+        decryptable (see <code>docs/ROADMAP.md</code> phase 2). This viewer shows
+        the real plaintext assets and a placeholder arena — the seed the engine
+        will grow into.
+      </p>
+    </aside>
+    <main>
+      <canvas id="scene"></canvas>
+      <div id="gallery"></div>
+    </main>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                 "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
