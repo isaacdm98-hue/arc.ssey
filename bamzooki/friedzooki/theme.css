@@ -111,12 +111,15 @@ input[type=range]{ width:100%; accent-color:var(--pink); height:26px; }
 /* ---- play HUD ---- */
 #play-ui { position:fixed; inset:0; z-index:6; pointer-events:none; }
 #play-ui button { pointer-events:auto; }
-.play-top { position:absolute; top:calc(10px + var(--st)); left:calc(10px + var(--sl));
-  right:calc(10px + var(--sr)); display:flex; justify-content:space-between; gap:8px; }
-.play-top .right { display:flex; gap:8px; }
-.hud { position:absolute; left:50%; bottom:calc(20px + var(--sb)); transform:translateX(-50%);
-  background:url("./assets/bubble-pink.png") center/100% 100% no-repeat; padding:14px 30px;
-  font-size:17px; white-space:nowrap; }
+.play-back { position:absolute; top:calc(10px + var(--st)); left:calc(10px + var(--sl)); }
+/* AR is part of the game — a charming hand-drawn invitation, not a naked button */
+.ar-pill { position:absolute; right:calc(12px + var(--sr)); bottom:calc(20px + var(--sb));
+  background:url("./assets/bubble-pink.png") center/100% 100% no-repeat;
+  padding:12px 20px; font-size:15px; }
+#recenter-btn.ar-pill { bottom:calc(74px + var(--sb)); }
+.hud { position:absolute; left:50%; bottom:calc(22px + var(--sb)); transform:translateX(-50%);
+  background:url("./assets/bubble-pink.png") center/100% 100% no-repeat; padding:13px 26px;
+  font-size:16px; white-space:nowrap; }
 .countdown { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   z-index:7; pointer-events:none; }
 .countdown b { font-family:"Caveat",cursive; font-size:clamp(90px,40vw,260px); color:var(--orange);
@@ -156,3 +159,7 @@ input[type=range]{ width:100%; accent-color:var(--pink); height:26px; }
 
 /* responsive: two-column controls collapse on narrow phones */
 @media (max-width:520px){ .controls { grid-template-columns:1fr; } .drawer { max-height:52vh; } }
+
+/* tiny unobtrusive build marker */
+.verstamp { position:fixed; bottom:8px; left:0; right:0; text-align:center;
+  font-size:10px; color:var(--muted); opacity:.4; }

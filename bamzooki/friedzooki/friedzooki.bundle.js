@@ -26886,6 +26886,10 @@
     const playing = name === "play";
     $2("#play-ui").classList.toggle("hidden", !playing);
     $2("#joy-wrap").classList.add("hidden");
+    if (playing) {
+      $2("#ar-btn").style.display = "";
+      $2("#ar-btn").textContent = "\u{1F4F7} See it on your desk";
+    }
     if (!playing) {
       teardown();
       engine.setOrbit();
@@ -26908,6 +26912,7 @@
     mode = "freeroam";
     showScreen("play");
     $2("#joy-wrap").classList.remove("hidden");
+    $2("#ar-btn").style.display = "none";
     $2("#hud").textContent = "Free Roam \u2014 drive with the stick, tap JUMP!";
     narrator.say("Free roam! Use the stick to wander, and give JUMP a try.");
   }
@@ -27204,15 +27209,17 @@
     if (want && ARSession.supported) {
       try {
         const target = (contest ? contest.player : player)?.object;
+        narrator.say("Point your phone at a flat surface \u2014 your Zook is on the desk!");
         await ar.start(target);
-        b2.textContent = "Exit AR";
+        b2.textContent = "\u2715 Exit AR";
         $2("#recenter-btn").classList.remove("hidden");
       } catch (e2) {
+        narrator.say("I couldn't reach the camera.");
         alert("Couldn't start camera AR: " + e2.message + "\n(Needs HTTPS + camera permission.)");
       }
     } else {
       ar.stop();
-      b2.textContent = "\u{1F4F7} AR";
+      b2.textContent = "\u{1F4F7} See it on your desk";
       $2("#recenter-btn").classList.add("hidden");
     }
   }
