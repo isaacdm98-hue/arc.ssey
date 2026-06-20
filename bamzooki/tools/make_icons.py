@@ -91,6 +91,9 @@ def main():
     draw(192).write(os.path.join(OUT, "icon-192.png"))
     draw(512).write(os.path.join(OUT, "icon-512.png"))
     draw(512, maskable=True).write(os.path.join(OUT, "icon-maskable-512.png"))
+    # Apple touch icon: iOS rounds the corners itself, so use a non-maskable,
+    # opaque 180x180 with the art comfortably inside.
+    draw(180).write(os.path.join(OUT, "apple-touch-icon.png"))
     print("wrote icons to", os.path.abspath(OUT))
 
 

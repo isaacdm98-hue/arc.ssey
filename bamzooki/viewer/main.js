@@ -14,6 +14,7 @@ const canvas = document.getElementById("scene");
 
 /* ---------------------------------------------------------------- 3D arena -- */
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); // crisp on retina
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0e14);
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
@@ -22,6 +23,8 @@ camera.position.set(6, 5, 9);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 1, 0);
+// Touch: one finger orbits, two fingers dolly/pan — natural on iPhone.
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
 scene.add(new THREE.HemisphereLight(0xbcd8ff, 0x202830, 1.1));
 const key = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -55,11 +58,13 @@ function placeholderZook() {
 const zook = placeholderZook();
 scene.add(zook);
 
+let lastW = 0, lastH = 0;
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (canvas.width !== w || canvas.height !== h) {
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
+  if (w !== lastW || h !== lastH) {
+    lastW = w; lastH = h;
+    renderer.setSize(w, h, false); // false: drive the buffer, keep CSS size from layout
+    camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
   }
 }
@@ -122,6 +127,16 @@ if ("serviceWorker" in navigator) {
 
 let deferredPrompt = null;
 const installBtn = document.getElementById("install");
+const iosHint = document.getElementById("iosHint");
+
+// Detect iPhone/iPad Safari (which never fires beforeinstallprompt) and, when
+// not already installed, show the "Share -> Add to Home Screen" instructions.
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = window.navigator.standalone === true ||
+  window.matchMedia("(display-mode: standalone)").matches;
+if (isIOS && !isStandalone) iosHint.style.display = "block";
+
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
