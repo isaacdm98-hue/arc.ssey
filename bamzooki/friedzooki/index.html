@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Patrick+Hand&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./theme.css" />
+  <link rel="stylesheet" href="./theme.css?v=5" />
 </head>
 <body>
   <video id="cam" playsinline muted></video>
@@ -24,6 +24,7 @@
   <section id="loading" class="screen show center">
     <div class="logo"><span class="fried">Fried</span>Zooki</div>
     <p class="muted">warming up the physics…</p>
+    <p class="muted small" style="opacity:.7">build v5 · single-bundle</p>
     <p id="boot-hint" class="muted small" style="display:none">Still loading — give it a moment on first run.</p>
     <p id="boot-err" class="small" style="display:none;color:#c0506a;max-width:80vw;word-break:break-word"></p>
   </section>
@@ -171,7 +172,9 @@
     document.getElementById("play-ui").classList.add("hidden");
     document.getElementById("joy-wrap").classList.add("hidden");
   </script>
-  <script type="module" src="./src/main.js"></script>
+  <!-- The entire app bundled into ONE classic script (no ES modules, no import
+       map, no separate fetches) for maximum compatibility and reliability. -->
+  <script src="./friedzooki.bundle.js?v=5"></script>
   <script>
     // Safety net: if a module fails to load/evaluate, show it instead of hanging
     // forever on "warming up the physics".
