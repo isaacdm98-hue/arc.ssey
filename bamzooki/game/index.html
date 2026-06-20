@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>BAMZOOKi</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0b0e14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="BAMZOOKi" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- AR camera feed sits behind the WebGL canvas -->
+  <video id="cam" playsinline muted></video>
+  <canvas id="scene"></canvas>
+
+  <!-- Loading -->
+  <div id="loading" class="overlay center">
+    <div class="logo">BAMZOOKi</div>
+    <div class="muted">Loading physics…</div>
+  </div>
+
+  <!-- MENU -->
+  <section id="screen-menu" class="screen overlay center hidden">
+    <div class="logo">BAMZOOKi</div>
+    <p class="muted">Build a creature. Tune how it moves. Race it — on your floor in AR.</p>
+    <div class="menu-btns">
+      <button class="primary big" data-go="builder">🛠 Build a Zook</button>
+      <button class="big" data-go="roster">📋 My Zooks</button>
+      <button class="big" data-go="events">🏁 Contests</button>
+    </div>
+    <button id="install" class="link" style="display:none">⬇ Install app</button>
+    <div id="ios-hint" class="muted small" style="display:none">
+      On iPhone: <b>Share ⬆ → Add to Home Screen</b> to install.
+    </div>
+  </section>
+
+  <!-- BUILDER -->
+  <section id="screen-builder" class="screen panel-left hidden">
+    <header class="bar">
+      <button class="link" data-go="menu">‹ Menu</button>
+      <b>Build &amp; Tune</b>
+      <span></span>
+    </header>
+    <div id="builder-controls" class="controls"></div>
+    <footer class="bar">
+      <button id="builder-new">New</button>
+      <button id="builder-save" class="primary">Save</button>
+      <button id="builder-test" class="primary">Test ▶</button>
+    </footer>
+  </section>
+
+  <!-- ROSTER -->
+  <section id="screen-roster" class="screen overlay hidden">
+    <header class="bar"><button class="link" data-go="menu">‹ Menu</button><b>My Zooks</b><span></span></header>
+    <div id="roster-list" class="list"></div>
+  </section>
+
+  <!-- EVENTS -->
+  <section id="screen-events" class="screen overlay hidden">
+    <header class="bar"><button class="link" data-go="menu">‹ Menu</button><b>Contests</b><span></span></header>
+    <p id="events-zook" class="muted"></p>
+    <div id="events-list" class="list"></div>
+  </section>
+
+  <!-- PLAY HUD (shown over the live 3D / AR) -->
+  <div id="play-ui" class="hidden">
+    <div class="play-top">
+      <button id="play-back" class="link">‹ Menu</button>
+      <button id="ar-btn">AR</button>
+    </div>
+    <div id="hud" class="hud hidden"></div>
+    <div id="result" class="result hidden">
+      <h2 id="result-title"></h2>
+      <p id="result-text"></p>
+      <div class="row">
+        <button id="result-retry" class="primary">Retry</button>
+        <button id="result-events">Other events</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.14.0"
+    }
+  }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
