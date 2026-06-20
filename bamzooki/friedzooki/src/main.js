@@ -27,10 +27,9 @@ const TRIAL_INTRO = {
 
 const $ = (s) => document.querySelector(s);
 const canvas = $("#scene");
-const engine = new Engine(canvas);
-const ar = new ARSession(engine, $("#cam"));
-const net = new Net();
-const joystick = new Joystick($("#joy-base"), $("#joy-knob"));
+// Created in boot() so any failure is caught and shown, not silently fatal.
+let engine, ar, net, joystick;
+function setStep(m) { const e = $("#boot-step"); if (e) e.textContent = m; }
 
 let genome = defaultGenome("My First Zook");
 let mode = "idle";          // idle | sandbox | freeroam | countdown | contest | net-host | net-client
@@ -88,7 +87,7 @@ function startVersus(key, gA, gB) {
 }
 
 /* --------------------------------------------------------------- loop ----- */
-engine.onFrame((dt, t) => {
+function frame(dt, t) {
   if (mode === "sandbox" && player) { player.update(t); world.step(); player.sync(); }
   else if (mode === "freeroam" && player) {
     const idle = !(joystick.x || joystick.y);
@@ -115,7 +114,7 @@ engine.onFrame((dt, t) => {
   else if (mode === "net-client" && contest) {
     if (netState) { contest.applyState(netState); $("#hud").textContent = netState.h || ""; }
   }
-});
+}
 
 /* --------------------------------------------------------- countdown ------ */
 function runCountdown() {
@@ -248,14 +247,16 @@ $("#net-host-connect").onclick = async () => {
 $("#net-offer-copy").onclick = () => { copyText($("#net-offer").value); netStatus("Invite copied!"); };
 $("#net-reply-copy").onclick = () => { copyText($("#net-reply").value); netStatus("Reply copied!"); };
 
-net.onOpen = () => { netStatus("Connected! 🎉"); net.send({ t: "hello", genome: netMine }); };
-net.onClose = () => { netStatus("Disconnected."); };
-net.onMessage = (m) => {
-  if (m.t === "hello") { netTheirs = m.genome; netMaybeReady(); }
-  else if (m.t === "start") { startNetClient(m.key, m.host, m.guest); }
-  else if (m.t === "state") { netState = m.s; }
-  else if (m.t === "result") { mode = "idle"; showNetResult(m.winner); }
-};
+function wireNet() {
+  net.onOpen = () => { netStatus("Connected! 🎉"); net.send({ t: "hello", genome: netMine }); };
+  net.onClose = () => { netStatus("Disconnected."); };
+  net.onMessage = (m) => {
+    if (m.t === "hello") { netTheirs = m.genome; netMaybeReady(); }
+    else if (m.t === "start") { startNetClient(m.key, m.host, m.guest); }
+    else if (m.t === "state") { netState = m.s; }
+    else if (m.t === "result") { mode = "idle"; showNetResult(m.winner); }
+  };
+}
 function netMaybeReady() {
   if (!netMine || !netTheirs) return;
   $("#net-start").style.display = "block";
@@ -471,23 +472,31 @@ function copyText(s) {
 function fmt(key, v) { return CONTESTS[key].cls.name === "HighJump" || key === "highjump" ? `${v.toFixed(2)}m` : `${v.toFixed(1)}s`; }
 
 /* ------------------------------------------------------------- startup ---- */
-const bootTimeout = (ms) => new Promise((_, rej) =>
-  setTimeout(() => rej(new Error("Physics took too long to start — tap to reload.")), ms));
-(async () => {
-  try {
-    await Promise.race([initPhysics(), bootTimeout(20000)]);
-    $("#loading").classList.remove("show");
-    showScreen("title");
-  } catch (e) {
-    const el = $("#boot-err");
-    if (el) {
-      el.style.display = "block";
-      el.style.cursor = "pointer";
-      el.textContent = "⚠ " + (e.message || e);
-      el.onclick = () => location.reload();
-    }
+const bootTimeout = (ms, what) => new Promise((_, rej) =>
+  setTimeout(() => rej(new Error(`${what} took too long — tap to reload.`)), ms));
+function bootError(e) {
+  const el = $("#boot-err");
+  if (el) {
+    el.style.display = "block"; el.style.cursor = "pointer";
+    el.textContent = "⚠ " + (e && e.message ? e.message : e);
+    el.onclick = () => location.reload();
   }
-})();
+}
+async function boot() {
+  setStep("starting the 3D engine…");
+  engine = new Engine(canvas);
+  ar = new ARSession(engine, $("#cam"));
+  net = new Net();
+  joystick = new Joystick($("#joy-base"), $("#joy-knob"));
+  wireNet();
+  engine.onFrame(frame);
+  setStep("loading physics…");
+  await Promise.race([initPhysics(), bootTimeout(8000, "Physics")]);
+  setStep("ready!");
+  $("#loading").classList.remove("show");
+  showScreen("title");
+}
+boot().catch(bootError);
 
 /* ---- PWA ---- */
 // (No service worker is registered — see the self-heal block in index.html.

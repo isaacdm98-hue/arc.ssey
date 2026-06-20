@@ -7629,8 +7629,8 @@
     let isAnimating = false;
     let animationLoop = null;
     let requestId = null;
-    function onAnimationFrame(time, frame) {
-      animationLoop(time, frame);
+    function onAnimationFrame(time, frame2) {
+      animationLoop(time, frame2);
       requestId = context.requestAnimationFrame(onAnimationFrame);
     }
     return {
@@ -10498,30 +10498,30 @@
   function WebGLObjects(gl, geometries, attributes, info) {
     let updateMap = /* @__PURE__ */ new WeakMap();
     function update(object) {
-      const frame = info.render.frame;
+      const frame2 = info.render.frame;
       const geometry = object.geometry;
       const buffergeometry = geometries.get(object, geometry);
-      if (updateMap.get(buffergeometry) !== frame) {
+      if (updateMap.get(buffergeometry) !== frame2) {
         geometries.update(buffergeometry);
-        updateMap.set(buffergeometry, frame);
+        updateMap.set(buffergeometry, frame2);
       }
       if (object.isInstancedMesh) {
         if (object.hasEventListener("dispose", onInstancedMeshDispose) === false) {
           object.addEventListener("dispose", onInstancedMeshDispose);
         }
-        if (updateMap.get(object) !== frame) {
+        if (updateMap.get(object) !== frame2) {
           attributes.update(object.instanceMatrix, gl.ARRAY_BUFFER);
           if (object.instanceColor !== null) {
             attributes.update(object.instanceColor, gl.ARRAY_BUFFER);
           }
-          updateMap.set(object, frame);
+          updateMap.set(object, frame2);
         }
       }
       if (object.isSkinnedMesh) {
         const skeleton = object.skeleton;
-        if (updateMap.get(skeleton) !== frame) {
+        if (updateMap.get(skeleton) !== frame2) {
           skeleton.update();
-          updateMap.set(skeleton, frame);
+          updateMap.set(skeleton, frame2);
         }
       }
       return buffergeometry;
@@ -15024,9 +15024,9 @@
       return isWebGL2 && renderTarget.samples > 0 && extensions.has("WEBGL_multisampled_render_to_texture") === true && renderTargetProperties.__useRenderToTexture !== false;
     }
     function updateVideoTexture(texture) {
-      const frame = info.render.frame;
-      if (_videoTextures.get(texture) !== frame) {
-        _videoTextures.set(texture, frame);
+      const frame2 = info.render.frame;
+      if (_videoTextures.get(texture) !== frame2) {
+        _videoTextures.set(texture, frame2);
         texture.update();
       }
     }
@@ -15310,18 +15310,18 @@
       }
       return this;
     }
-    update(inputSource, frame, referenceSpace) {
+    update(inputSource, frame2, referenceSpace) {
       let inputPose = null;
       let gripPose = null;
       let handPose = null;
       const targetRay = this._targetRay;
       const grip = this._grip;
       const hand = this._hand;
-      if (inputSource && frame.session.visibilityState !== "visible-blurred") {
+      if (inputSource && frame2.session.visibilityState !== "visible-blurred") {
         if (hand && inputSource.hand) {
           handPose = true;
           for (const inputjoint of inputSource.hand.values()) {
-            const jointPose = frame.getJointPose(inputjoint, referenceSpace);
+            const jointPose = frame2.getJointPose(inputjoint, referenceSpace);
             const joint = this._getHandJoint(hand, inputjoint);
             if (jointPose !== null) {
               joint.matrix.fromArray(jointPose.transform.matrix);
@@ -15353,7 +15353,7 @@
           }
         } else {
           if (grip !== null && inputSource.gripSpace) {
-            gripPose = frame.getPose(inputSource.gripSpace, referenceSpace);
+            gripPose = frame2.getPose(inputSource.gripSpace, referenceSpace);
             if (gripPose !== null) {
               grip.matrix.fromArray(gripPose.transform.matrix);
               grip.matrix.decompose(grip.position, grip.rotation, grip.scale);
@@ -15374,7 +15374,7 @@
           }
         }
         if (targetRay !== null) {
-          inputPose = frame.getPose(inputSource.targetRaySpace, referenceSpace);
+          inputPose = frame2.getPose(inputSource.targetRaySpace, referenceSpace);
           if (inputPose === null && gripPose !== null) {
             inputPose = gripPose;
           }
@@ -15773,9 +15773,9 @@
         }
       };
       let onAnimationFrameCallback = null;
-      function onAnimationFrame(time, frame) {
-        pose = frame.getViewerPose(customReferenceSpace || referenceSpace);
-        xrFrame = frame;
+      function onAnimationFrame(time, frame2) {
+        pose = frame2.getViewerPose(customReferenceSpace || referenceSpace);
+        xrFrame = frame2;
         if (pose !== null) {
           const views = pose.views;
           if (glBaseLayer !== null) {
@@ -15829,12 +15829,12 @@
           const inputSource = controllerInputSources[i2];
           const controller = controllers[i2];
           if (inputSource !== null && controller !== void 0) {
-            controller.update(inputSource, frame, customReferenceSpace || referenceSpace);
+            controller.update(inputSource, frame2, customReferenceSpace || referenceSpace);
           }
         }
-        if (onAnimationFrameCallback) onAnimationFrameCallback(time, frame);
-        if (frame.detectedPlanes) {
-          scope.dispatchEvent({ type: "planesdetected", data: frame });
+        if (onAnimationFrameCallback) onAnimationFrameCallback(time, frame2);
+        if (frame2.detectedPlanes) {
+          scope.dispatchEvent({ type: "planesdetected", data: frame2 });
         }
         xrFrame = null;
       }
@@ -16163,10 +16163,10 @@
       }
       const webglProgram = program.program;
       state.updateUBOMapping(uniformsGroup, webglProgram);
-      const frame = info.render.frame;
-      if (updateList[uniformsGroup.id] !== frame) {
+      const frame2 = info.render.frame;
+      if (updateList[uniformsGroup.id] !== frame2) {
         updateBufferData(uniformsGroup);
-        updateList[uniformsGroup.id] = frame;
+        updateList[uniformsGroup.id] = frame2;
       }
     }
     function createBuffer(uniformsGroup) {
@@ -26967,10 +26967,14 @@
   };
   var $2 = (s2) => document.querySelector(s2);
   var canvas = $2("#scene");
-  var engine = new Engine(canvas);
-  var ar = new ARSession(engine, $2("#cam"));
-  var net = new Net();
-  var joystick = new Joystick($2("#joy-base"), $2("#joy-knob"));
+  var engine;
+  var ar;
+  var net;
+  var joystick;
+  function setStep(m2) {
+    const e2 = $2("#boot-step");
+    if (e2) e2.textContent = m2;
+  }
   var genome = defaultGenome("My First Zook");
   var mode = "idle";
   var world = null;
@@ -27039,7 +27043,7 @@
     narrator.say(`${gA2.name} versus ${gB.name}. May the best Zook win!`);
     runCountdown();
   }
-  engine.onFrame((dt, t2) => {
+  function frame(dt, t2) {
     if (mode === "sandbox" && player) {
       player.update(t2);
       world.step();
@@ -27076,7 +27080,7 @@
         $2("#hud").textContent = netState.h || "";
       }
     }
-  });
+  }
   function runCountdown() {
     const el2 = $2("#countdown");
     const seq = ["3", "2", "1", "GO!"];
@@ -27246,26 +27250,28 @@
     copyText($2("#net-reply").value);
     netStatus("Reply copied!");
   };
-  net.onOpen = () => {
-    netStatus("Connected! \u{1F389}");
-    net.send({ t: "hello", genome: netMine });
-  };
-  net.onClose = () => {
-    netStatus("Disconnected.");
-  };
-  net.onMessage = (m2) => {
-    if (m2.t === "hello") {
-      netTheirs = m2.genome;
-      netMaybeReady();
-    } else if (m2.t === "start") {
-      startNetClient(m2.key, m2.host, m2.guest);
-    } else if (m2.t === "state") {
-      netState = m2.s;
-    } else if (m2.t === "result") {
-      mode = "idle";
-      showNetResult(m2.winner);
-    }
-  };
+  function wireNet() {
+    net.onOpen = () => {
+      netStatus("Connected! \u{1F389}");
+      net.send({ t: "hello", genome: netMine });
+    };
+    net.onClose = () => {
+      netStatus("Disconnected.");
+    };
+    net.onMessage = (m2) => {
+      if (m2.t === "hello") {
+        netTheirs = m2.genome;
+        netMaybeReady();
+      } else if (m2.t === "start") {
+        startNetClient(m2.key, m2.host, m2.guest);
+      } else if (m2.t === "state") {
+        netState = m2.s;
+      } else if (m2.t === "result") {
+        mode = "idle";
+        showNetResult(m2.winner);
+      }
+    };
+  }
   function netMaybeReady() {
     if (!netMine || !netTheirs) return;
     $2("#net-start").style.display = "block";
@@ -27618,22 +27624,31 @@
   function fmt(key, v2) {
     return CONTESTS[key].cls.name === "HighJump" || key === "highjump" ? `${v2.toFixed(2)}m` : `${v2.toFixed(1)}s`;
   }
-  var bootTimeout = (ms) => new Promise((_2, rej) => setTimeout(() => rej(new Error("Physics took too long to start \u2014 tap to reload.")), ms));
-  (async () => {
-    try {
-      await Promise.race([initPhysics(), bootTimeout(2e4)]);
-      $2("#loading").classList.remove("show");
-      showScreen("title");
-    } catch (e2) {
-      const el2 = $2("#boot-err");
-      if (el2) {
-        el2.style.display = "block";
-        el2.style.cursor = "pointer";
-        el2.textContent = "\u26A0 " + (e2.message || e2);
-        el2.onclick = () => location.reload();
-      }
+  var bootTimeout = (ms, what) => new Promise((_2, rej) => setTimeout(() => rej(new Error(`${what} took too long \u2014 tap to reload.`)), ms));
+  function bootError(e2) {
+    const el2 = $2("#boot-err");
+    if (el2) {
+      el2.style.display = "block";
+      el2.style.cursor = "pointer";
+      el2.textContent = "\u26A0 " + (e2 && e2.message ? e2.message : e2);
+      el2.onclick = () => location.reload();
     }
-  })();
+  }
+  async function boot() {
+    setStep("starting the 3D engine\u2026");
+    engine = new Engine(canvas);
+    ar = new ARSession(engine, $2("#cam"));
+    net = new Net();
+    joystick = new Joystick($2("#joy-base"), $2("#joy-knob"));
+    wireNet();
+    engine.onFrame(frame);
+    setStep("loading physics\u2026");
+    await Promise.race([initPhysics(), bootTimeout(8e3, "Physics")]);
+    setStep("ready!");
+    $2("#loading").classList.remove("show");
+    showScreen("title");
+  }
+  boot().catch(bootError);
   var deferred = null;
   window.addEventListener("beforeinstallprompt", (e2) => {
     e2.preventDefault();
