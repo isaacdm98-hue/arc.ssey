@@ -41,6 +41,8 @@ export function sketchTexture(hex, size = 256) {
 
 /** A tiling paper texture for the ground (grain + faint hand-drawn grid). */
 export function paperTexture(hex = "#6f9b6a", size = 512, repeat = 24) {
+  return null;   // robust: ground falls back to a flat MeshStandardMaterial that always renders
+  // eslint-disable-next-line no-unreachable
   if (!hasDOM) return null;
   const key = "p" + hex + repeat;
   if (_cache.has(key)) return _cache.get(key);
@@ -83,9 +85,8 @@ export function toonRamp() {
 
 /** A material that looks hand-drawn: toon shading + sketch map, or flat fallback. */
 export function sketchMaterial(hex) {
-  const map = sketchTexture(hex);
-  if (!map) return new THREE.MeshStandardMaterial({ color: hex, roughness: 0.7 });
-  return new THREE.MeshToonMaterial({ map, gradientMap: toonRamp() });
+  // Bulletproof, well-supported material so models always render on any device.
+  return new THREE.MeshStandardMaterial({ color: hex, roughness: 0.72, metalness: 0.02, flatShading: false });
 }
 
 /** Background sky gradient (warm cream → soft sky). */

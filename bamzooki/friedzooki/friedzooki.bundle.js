@@ -17733,16 +17733,6 @@
       return data;
     }
   };
-  var DataTexture = class extends Texture {
-    constructor(data = null, width = 1, height = 1, format, type, mapping, wrapS, wrapT, magFilter = NearestFilter, minFilter = NearestFilter, anisotropy, colorSpace) {
-      super(null, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy, colorSpace);
-      this.isDataTexture = true;
-      this.image = { data, width, height };
-      this.generateMipmaps = false;
-      this.flipY = false;
-      this.unpackAlignment = 1;
-    }
-  };
   var CanvasTexture = class extends Texture {
     constructor(canvas2, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy) {
       super(canvas2, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy);
@@ -20493,7 +20483,13 @@
       const dt = Math.min(0.05, (now - this._last) / 1e3);
       this._last = now;
       this._resize();
-      if (this._cb) this._cb(dt, now / 1e3);
+      if (this._cb) {
+        try {
+          this._cb(dt, now / 1e3);
+        } catch (e2) {
+          console.error(e2);
+        }
+      }
       if (this.ar.active) {
         const t2 = this.ar.targetObj ? this.ar.targetObj.position : this._tmp.set(0, 0, 0);
         const { radius: r2, theta, phi } = this.ar;
@@ -25630,48 +25626,8 @@
     const c2 = new Color(hex);
     return `rgb(${c2.r * 255 * f2 | 0},${c2.g * 255 * f2 | 0},${c2.b * 255 * f2 | 0})`;
   }
-  function sketchTexture(hex, size = 256) {
-    if (!hasDOM) return null;
-    const key = "s" + hex;
-    if (_cache2.has(key)) return _cache2.get(key);
-    const cv = document.createElement("canvas");
-    cv.width = cv.height = size;
-    const x2 = cv.getContext("2d");
-    x2.fillStyle = shade(hex, 1);
-    x2.fillRect(0, 0, size, size);
-    x2.globalAlpha = 0.18;
-    x2.fillStyle = shade(hex, 1.18);
-    for (let i2 = 0; i2 < 26; i2++) {
-      x2.beginPath();
-      x2.ellipse(Math.random() * size, Math.random() * size, 10 + Math.random() * 26, 8 + Math.random() * 18, Math.random() * 6, 0, 7);
-      x2.fill();
-    }
-    x2.globalAlpha = 0.16;
-    x2.strokeStyle = shade(hex, 0.55);
-    x2.lineWidth = 2;
-    x2.lineCap = "round";
-    for (let i2 = 0; i2 < 90; i2++) {
-      const px2 = Math.random() * size, py2 = Math.random() * size, a2 = Math.random() * Math.PI, len = 8 + Math.random() * 16;
-      x2.beginPath();
-      x2.moveTo(px2, py2);
-      x2.lineTo(px2 + Math.cos(a2) * len, py2 + Math.sin(a2) * len);
-      x2.stroke();
-    }
-    x2.globalAlpha = 0.5;
-    x2.fillStyle = shade(hex, 0.4);
-    for (let i2 = 0; i2 < 40; i2++) {
-      x2.beginPath();
-      x2.arc(Math.random() * size, Math.random() * size, 0.6 + Math.random() * 1.2, 0, 7);
-      x2.fill();
-    }
-    x2.globalAlpha = 1;
-    const tex = new CanvasTexture(cv);
-    tex.colorSpace = SRGBColorSpace;
-    tex.anisotropy = 4;
-    _cache2.set(key, tex);
-    return tex;
-  }
   function paperTexture(hex = "#6f9b6a", size = 512, repeat = 24) {
+    return null;
     if (!hasDOM) return null;
     const key = "p" + hex + repeat;
     if (_cache2.has(key)) return _cache2.get(key);
@@ -25713,20 +25669,8 @@
       x2.lineTo(x0 + (x1 - x0) * t2 + (Math.random() - 0.5) * 3, y0 + (y1 - y0) * t2 + (Math.random() - 0.5) * 3);
     }
   }
-  function toonRamp() {
-    if (!hasDOM) return null;
-    if (_cache2.has("ramp")) return _cache2.get("ramp");
-    const data = new Uint8Array([90, 90, 90, 255, 160, 160, 160, 255, 215, 215, 215, 255, 255, 255, 255, 255]);
-    const tex = new DataTexture(data, 4, 1, RGBAFormat);
-    tex.minFilter = tex.magFilter = NearestFilter;
-    tex.needsUpdate = true;
-    _cache2.set("ramp", tex);
-    return tex;
-  }
   function sketchMaterial(hex) {
-    const map = sketchTexture(hex);
-    if (!map) return new MeshStandardMaterial({ color: hex, roughness: 0.7 });
-    return new MeshToonMaterial({ map, gradientMap: toonRamp() });
+    return new MeshStandardMaterial({ color: hex, roughness: 0.72, metalness: 0.02, flatShading: false });
   }
 
   // src/zook.js
@@ -27367,8 +27311,60 @@
       updateBuildStats();
     });
     updateBuildStats();
-    narrator.say("Welcome to the workshop. Slide the controls and watch your Zook spring to life.");
+    maybeCoach();
   }
+  var COACH = [
+    "Welcome to FriedZooki! Let's build your very first creature \u2014 a Zook.",
+    "Say hello! This is your Zook, here on the stage. Every change you make, it feels at once.",
+    "Slide BODY and LEGS to shape it. More legs make it steadier on its feet.",
+    "MUSCLE POWER and STEP SPEED decide how fast it scampers along.",
+    "Pick a colour, and give your Zook a name up at the top.",
+    "When it looks just right, tap TEST \u25B6 to watch it run. Then take it to the Trials!"
+  ];
+  var coachStep = 0;
+  var coachSeen = false;
+  function maybeCoach() {
+    if (coachSeen) return;
+    try {
+      if (localStorage.getItem("friedzooki.coached") === "1") {
+        coachSeen = true;
+        return;
+      }
+    } catch (_2) {
+    }
+    if (loadRoster().length > 0) {
+      coachSeen = true;
+      return;
+    }
+    coachSeen = true;
+    coachStep = 0;
+    $2("#coach").classList.remove("hidden");
+    showCoach();
+  }
+  function showCoach() {
+    const t2 = COACH[coachStep];
+    $2("#coach-text").textContent = t2;
+    narrator.say(t2);
+  }
+  $2("#coach-next").onclick = () => {
+    sfx.tap();
+    coachStep++;
+    if (coachStep >= COACH.length) {
+      $2("#coach").classList.add("hidden");
+      try {
+        localStorage.setItem("friedzooki.coached", "1");
+      } catch (_2) {
+      }
+    } else showCoach();
+  };
+  $2("#coach-skip").onclick = () => {
+    sfx.back();
+    $2("#coach").classList.add("hidden");
+    try {
+      localStorage.setItem("friedzooki.coached", "1");
+    } catch (_2) {
+    }
+  };
   function updateBuildStats() {
     const g2 = genome;
     const top = (g2.gait.drive * 0.34).toFixed(1);

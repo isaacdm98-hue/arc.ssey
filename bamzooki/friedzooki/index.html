@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="FriedZooki" />
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="./theme.css?v=9" />
+  <link rel="stylesheet" href="./theme.css?v=10" />
 </head>
 <body>
   <video id="cam" playsinline muted></video>
@@ -24,7 +24,7 @@
     <p id="boot-step" class="muted">starting…</p>
     <p id="boot-hint" class="muted small" style="display:none">Still loading — give it a moment.</p>
     <p id="boot-err" class="small" style="display:none;color:#c0506a;max-width:84vw;word-break:break-word"></p>
-    <span class="verstamp">v9</span>
+    <span class="verstamp">v10</span>
   </section>
 
   <!-- TITLE -->
@@ -32,7 +32,7 @@
     <div class="logo"><span class="fried">Fried</span>Zooki</div>
     <p class="tag">Build a creature. Tune how it moves. Race it on your desk.</p>
     <div class="menu">
-      <button class="btn-blob" data-go="build">🛠 Workshop</button>
+      <button class="btn-blob" data-go="build">✨ Build a Zook</button>
       <button class="btn-bubble" data-go="roster">📋 My Zooks</button>
       <button class="btn-bubble" data-go="trials">🏁 Trials</button>
       <button class="btn-bubble" data-go="versus">👥 Versus</button>
@@ -144,6 +144,15 @@
     </div>
   </div>
 
+  <!-- COACH (guided onboarding: explains the builder through text + animation) -->
+  <div id="coach" class="coach hidden">
+    <p id="coach-text"></p>
+    <div class="coach-row">
+      <button id="coach-skip" class="btn-plain">Skip</button>
+      <button id="coach-next" class="btn-blob">Got it →</button>
+    </div>
+  </div>
+
   <!-- RESULT MODAL -->
   <div id="result" class="modal-wrap">
     <div class="modal panel">
@@ -170,7 +179,7 @@
   </script>
   <!-- The entire app bundled into ONE classic script (no ES modules, no import
        map, no separate fetches) for maximum compatibility and reliability. -->
-  <script src="./friedzooki.bundle.js?v=9"></script>
+  <script src="./friedzooki.bundle.js?v=10"></script>
   <script>
     // Safety net: if a module fails to load/evaluate, show it instead of hanging
     // forever on "warming up the physics".

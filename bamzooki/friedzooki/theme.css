@@ -216,3 +216,28 @@ h2, .build-name input, .countdown b { font-family:"Patrick Hand", system-ui, san
 /* the ONE PNG accent: a soft blob glow behind the title */
 #screen-title::before { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
   background:url("./assets/blob-yellow.png") center 20% / min(300px,70vw) no-repeat; opacity:.16; }
+
+/* menu screens are opaque (paper) so the 3D canvas never bleeds through;
+   the Workshop stays transparent so the Zook is on stage. */
+.screen { background: var(--paper); }
+#screen-build { background: transparent; }
+
+/* ---- guided coach (onboarding) ---- */
+.coach { position:fixed; left:50%; bottom:calc(20px + var(--sb)); transform:translateX(-50%);
+  z-index:12; width:min(440px,92vw); background:rgba(255,255,255,.94); border:2.5px solid var(--ink);
+  border-radius:18px; box-shadow:3px 4px 0 rgba(0,0,0,.12); padding:16px 18px; text-align:center;
+  animation:coachIn .4s ease both; }
+.coach.hidden { display:none; }
+.coach #coach-text { font-size:20px; margin:0 0 12px; min-height:48px; }
+.coach-row { display:flex; gap:10px; justify-content:center; }
+@keyframes coachIn { from{opacity:0; transform:translateX(-50%) translateY(16px)} to{opacity:1; transform:translateX(-50%) translateY(0)} }
+
+/* gentle staggered entrance for menu buttons (a touch of magic) */
+#screen-title .menu button { animation:rise .5s ease both; }
+#screen-title .menu button:nth-child(2){ animation-delay:.05s }
+#screen-title .menu button:nth-child(3){ animation-delay:.10s }
+#screen-title .menu button:nth-child(4){ animation-delay:.15s }
+#screen-title .menu button:nth-child(5){ animation-delay:.20s }
+#screen-title .menu button:nth-child(6){ animation-delay:.25s }
+#screen-title .menu button:nth-child(7){ animation-delay:.30s }
+@keyframes rise { from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }

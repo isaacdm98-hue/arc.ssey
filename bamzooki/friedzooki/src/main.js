@@ -330,8 +330,33 @@ function openBuild() {
     updateBuildStats();
   });
   updateBuildStats();
-  narrator.say("Welcome to the workshop. Slide the controls and watch your Zook spring to life.");
+  maybeCoach();
 }
+
+/* ---- guided onboarding coach (teaches the builder through text) ---- */
+const COACH = [
+  "Welcome to FriedZooki! Let's build your very first creature — a Zook.",
+  "Say hello! This is your Zook, here on the stage. Every change you make, it feels at once.",
+  "Slide BODY and LEGS to shape it. More legs make it steadier on its feet.",
+  "MUSCLE POWER and STEP SPEED decide how fast it scampers along.",
+  "Pick a colour, and give your Zook a name up at the top.",
+  "When it looks just right, tap TEST ▶ to watch it run. Then take it to the Trials!",
+];
+let coachStep = 0, coachSeen = false;
+function maybeCoach() {
+  if (coachSeen) return;
+  try { if (localStorage.getItem("friedzooki.coached") === "1") { coachSeen = true; return; } } catch (_) {}
+  if (loadRoster().length > 0) { coachSeen = true; return; }
+  coachSeen = true;
+  coachStep = 0; $("#coach").classList.remove("hidden"); showCoach();
+}
+function showCoach() { const t = COACH[coachStep]; $("#coach-text").textContent = t; narrator.say(t); }
+$("#coach-next").onclick = () => {
+  sfx.tap(); coachStep++;
+  if (coachStep >= COACH.length) { $("#coach").classList.add("hidden"); try { localStorage.setItem("friedzooki.coached", "1"); } catch (_) {} }
+  else showCoach();
+};
+$("#coach-skip").onclick = () => { sfx.back(); $("#coach").classList.add("hidden"); try { localStorage.setItem("friedzooki.coached", "1"); } catch (_) {} };
 function updateBuildStats() {
   const g = genome;
   const top = (g.gait.drive * 0.34).toFixed(1);

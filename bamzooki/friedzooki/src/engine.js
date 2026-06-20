@@ -94,7 +94,7 @@ export class Engine {
     const dt = Math.min(0.05, (now - this._last) / 1000);
     this._last = now;
     this._resize();
-    if (this._cb) this._cb(dt, now / 1000);
+    if (this._cb) { try { this._cb(dt, now / 1000); } catch (e) { /* keep rendering even if a frame errors */ console.error(e); } }
 
     if (this.ar.active) {
       // Orbit the (moving) target at a fixed radius; angles come from the phone's
