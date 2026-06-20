@@ -3406,27 +3406,27 @@
         te[6] = b2 * c2;
         te[10] = a2 * c2;
       } else if (euler.order === "YZX") {
-        const ac2 = a2 * c2, ad = a2 * d2, bc = b2 * c2, bd = b2 * d2;
+        const ac3 = a2 * c2, ad = a2 * d2, bc = b2 * c2, bd = b2 * d2;
         te[0] = c2 * e2;
-        te[4] = bd - ac2 * f2;
+        te[4] = bd - ac3 * f2;
         te[8] = bc * f2 + ad;
         te[1] = f2;
         te[5] = a2 * e2;
         te[9] = -b2 * e2;
         te[2] = -d2 * e2;
         te[6] = ad * f2 + bc;
-        te[10] = ac2 - bd * f2;
+        te[10] = ac3 - bd * f2;
       } else if (euler.order === "XZY") {
-        const ac2 = a2 * c2, ad = a2 * d2, bc = b2 * c2, bd = b2 * d2;
+        const ac3 = a2 * c2, ad = a2 * d2, bc = b2 * c2, bd = b2 * d2;
         te[0] = c2 * e2;
         te[4] = -f2;
         te[8] = d2 * e2;
-        te[1] = ac2 * f2 + bd;
+        te[1] = ac3 * f2 + bd;
         te[5] = a2 * e2;
         te[9] = ad * f2 - bc;
         te[2] = bc * f2 - ad;
         te[6] = b2 * e2;
-        te[10] = bd * f2 + ac2;
+        te[10] = bd * f2 + ac3;
       }
       te[3] = 0;
       te[7] = 0;
@@ -9170,12 +9170,12 @@
     this.numPlanes = 0;
     this.numIntersection = 0;
     this.init = function(planes, enableLocalClipping) {
-      const enabled2 = planes.length !== 0 || enableLocalClipping || // enable state of previous frame - the clipping code has to
+      const enabled = planes.length !== 0 || enableLocalClipping || // enable state of previous frame - the clipping code has to
       // run another frame in order to reset the state:
       numGlobalPlanes !== 0 || localClippingEnabled;
       localClippingEnabled = enableLocalClipping;
       numGlobalPlanes = planes.length;
-      return enabled2;
+      return enabled;
     };
     this.beginShadows = function() {
       renderingShadows = true;
@@ -26662,58 +26662,106 @@
   };
 
   // src/narrator.js
-  var KEY2 = "friedzooki.narrator";
-  var POLLY = (voice, text) => `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(text)}`;
-  var enabled = localStorage.getItem(KEY2) !== "off";
-  var audio = null;
-  var lastSpoken = "";
-  function fallback(text) {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
-    synth.cancel();
-    const u2 = new SpeechSynthesisUtterance(text);
-    const voices = synth.getVoices();
-    const pref = ["Daniel", "Arthur", "Google UK English Male", "Samantha", "Google US English", "Aaron", "Martha"];
-    u2.voice = pref.map((n2) => voices.find((v2) => v2.name.includes(n2))).find(Boolean) || voices.find((v2) => v2.lang.startsWith("en")) || null;
-    u2.rate = 1;
-    u2.pitch = 1.05;
-    synth.speak(u2);
+  var _ctx = null;
+  var _enabled = null;
+  var _captionEl = null;
+  var _hideTimer = null;
+  function ac2() {
+    if (!_ctx) {
+      try {
+        _ctx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (_2) {
+        _ctx = false;
+      }
+    }
+    if (_ctx && _ctx.state === "suspended") _ctx.resume();
+    return _ctx || null;
+  }
+  function readEnabled() {
+    if (_enabled === null) {
+      try {
+        _enabled = localStorage.getItem("friedzooki.voice") !== "off";
+      } catch (_2) {
+        _enabled = true;
+      }
+    }
+    return _enabled;
+  }
+  function caption() {
+    if (!_captionEl) _captionEl = document.getElementById("narration");
+    return _captionEl;
+  }
+  function blip(freq, t0, dur) {
+    const a2 = ac2();
+    if (!a2) return;
+    const g2 = a2.createGain();
+    g2.gain.setValueAtTime(1e-4, t0);
+    g2.gain.exponentialRampToValueAtTime(0.14, t0 + 0.012);
+    g2.gain.exponentialRampToValueAtTime(1e-4, t0 + dur);
+    g2.connect(a2.destination);
+    for (const [type, det, gain] of [["triangle", 0, 1], ["sine", 7, 0.6]]) {
+      const o2 = a2.createOscillator();
+      o2.type = type;
+      o2.frequency.setValueAtTime(freq + det, t0);
+      o2.frequency.linearRampToValueAtTime(freq * 1.04 + det, t0 + dur * 0.6);
+      const gg2 = a2.createGain();
+      gg2.gain.value = gain;
+      o2.connect(gg2).connect(g2);
+      o2.start(t0);
+      o2.stop(t0 + dur + 0.02);
+    }
+  }
+  function speakGibberish(text) {
+    const a2 = ac2();
+    if (!a2) return;
+    const sylls = (text.toLowerCase().match(/[aeiouy]+|[^aeiouy\s]+|\s+/g) || []).filter((s2) => s2.trim());
+    const base2 = 300, span = 360;
+    let t2 = a2.currentTime + 0.02;
+    const step = 0.085;
+    const max = Math.min(sylls.length, 26);
+    for (let i2 = 0; i2 < max; i2++) {
+      const s2 = sylls[i2];
+      const isVowel = /[aeiouy]/.test(s2[0]);
+      const code = s2.charCodeAt(0) || 100;
+      const semis = code % 9;
+      const freq = base2 + semis / 9 * span + (isVowel ? 40 : 0);
+      blip(freq, t2, isVowel ? 0.13 : 0.07);
+      t2 += step + (isVowel ? 0.02 : 0);
+    }
+  }
+  function showCaption(text) {
+    const el2 = caption();
+    if (!el2) return;
+    el2.textContent = text;
+    el2.classList.add("show");
+    clearTimeout(_hideTimer);
+    _hideTimer = setTimeout(() => el2.classList.remove("show"), Math.min(7e3, 1800 + text.length * 55));
   }
   var narrator = {
     get enabled() {
-      return enabled;
+      return readEnabled();
     },
     toggle() {
-      enabled = !enabled;
-      localStorage.setItem(KEY2, enabled ? "on" : "off");
-      if (!enabled) this.stop();
-      return enabled;
+      _enabled = !readEnabled();
+      try {
+        localStorage.setItem("friedzooki.voice", _enabled ? "on" : "off");
+      } catch (_2) {
+      }
+      return _enabled;
     },
     stop() {
-      if (audio) {
+    },
+    say(text) {
+      if (!text) return;
+      showCaption(text);
+      if (readEnabled()) {
         try {
-          audio.pause();
+          speakGibberish(text);
         } catch (_2) {
         }
-        audio = null;
       }
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
-    },
-    /** Speak a line (interrupts the previous). De-dupes identical back-to-back lines. */
-    say(text, { force = false } = {}) {
-      if (!enabled || !text) return;
-      if (!force && text === lastSpoken) return;
-      lastSpoken = text;
-      this.stop();
-      const a2 = new Audio();
-      a2.crossOrigin = "anonymous";
-      a2.src = POLLY("Brian", text);
-      a2.onerror = () => fallback(text);
-      audio = a2;
-      a2.play().catch(() => fallback(text));
     }
   };
-  if (window.speechSynthesis) window.speechSynthesis.getVoices();
 
   // src/main.js
   var TRIAL_INTRO = {

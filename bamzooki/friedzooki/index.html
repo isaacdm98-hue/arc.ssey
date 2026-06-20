@@ -14,11 +14,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Patrick+Hand&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./theme.css?v=6" />
+  <link rel="stylesheet" href="./theme.css?v=7" />
 </head>
 <body>
   <video id="cam" playsinline muted></video>
   <canvas id="scene"></canvas>
+  <div id="narration" class="narration"></div>
 
   <!-- Loading -->
   <section id="loading" class="screen show center">
@@ -26,7 +27,7 @@
     <p class="muted">warming up the physics…</p>
     <p id="boot-hint" class="muted small" style="display:none">Still loading — give it a moment.</p>
     <p id="boot-err" class="small" style="display:none;color:#c0506a;max-width:80vw;word-break:break-word"></p>
-    <span class="verstamp">v6</span>
+    <span class="verstamp">v7</span>
   </section>
 
   <!-- TITLE -->
@@ -170,14 +171,13 @@
   </script>
   <!-- The entire app bundled into ONE classic script (no ES modules, no import
        map, no separate fetches) for maximum compatibility and reliability. -->
-  <script src="./friedzooki.bundle.js?v=6"></script>
+  <script src="./friedzooki.bundle.js?v=7"></script>
   <script>
     // Safety net: if a module fails to load/evaluate, show it instead of hanging
     // forever on "warming up the physics".
-    window.addEventListener("error", (e) => {
-      if (e.message && /import|module|fetch/i.test(e.message)) showBootError(e.message);
-    });
-    window.addEventListener("unhandledrejection", (e) => showBootError((e.reason && e.reason.message) || String(e.reason)));
+    // Surface ANY uncaught error on the loading screen — never hang silently.
+    window.addEventListener("error", (e) => showBootError((e.message || "Script error") + (e.filename ? " @ " + e.filename.split("/").pop() + ":" + e.lineno : "")));
+    window.addEventListener("unhandledrejection", (e) => showBootError("Promise: " + ((e.reason && e.reason.message) || String(e.reason))));
     setTimeout(() => {
       const l = document.getElementById("loading");
       if (l && l.classList.contains("show")) document.getElementById("boot-hint").style.display = "block";
