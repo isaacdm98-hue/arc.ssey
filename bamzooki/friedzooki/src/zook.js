@@ -2,8 +2,9 @@
 // single driven rigid body (reliable, controllable racing physics) with legs
 // that animate over it for life. The genome (size, mass, leg count/length,
 // gait speed, muscle power, jump, steer) shapes how it races, jumps and pushes.
-import * as THREE from "three";
+import * as THREE from "../vendor/three.module.js";
 import { RAPIER } from "./physics.js";
+import { sketchMaterial } from "./textures.js";
 
 /** A fresh, sensible default genome: a four-legged trotter. */
 export function defaultGenome(name = "Newzook") {
@@ -64,7 +65,7 @@ export class Zook {
     this._build(this.start.x, this.start.y, this.start.z, heading);
   }
 
-  _mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.1 }); }
+  _mat(color) { return sketchMaterial(color); }
 
   _build(x, y, z, heading) {
     const g = this.genome;

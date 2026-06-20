@@ -3,7 +3,7 @@
 // drives them, and reports a result with a numeric metric for the Zook Passport.
 // Races run until the PLAYER finishes (or time runs out), so every attempt
 // records a time/score.
-import * as THREE from "three";
+import * as THREE from "../vendor/three.module.js";
 import { Arena } from "./arena.js";
 import { Zook } from "./zook.js";
 

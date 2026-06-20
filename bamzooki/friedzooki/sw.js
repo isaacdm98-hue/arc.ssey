@@ -1,12 +1,13 @@
 // Service worker — precache the app shell, runtime cache-first for everything
 // else (Three.js, Rapier WASM, fonts), so FriedZooki runs offline after first use.
-const VERSION = "friedzooki-v1";
+const VERSION = "friedzooki-v2";
 const SHELL = [
   "./", "./index.html", "./theme.css", "./manifest.webmanifest",
+  "./vendor/three.module.js", "./vendor/rapier.es.js",
   "./src/main.js", "./src/engine.js", "./src/physics.js", "./src/zook.js",
   "./src/arena.js", "./src/contests.js", "./src/builder.js", "./src/storage.js",
-  "./src/ar.js", "./src/sound.js", "./src/fx.js",
-  "./src/net.js", "./src/joystick.js",
+  "./src/ar.js", "./src/sound.js", "./src/fx.js", "./src/orbit.js",
+  "./src/textures.js", "./src/net.js", "./src/joystick.js", "./src/narrator.js",
   "./assets/frame-green.png", "./assets/frame-dashed.png",
   "./assets/blob-yellow.png", "./assets/bubble-pink.png",
   "./icons/icon-192.png", "./icons/icon-512.png",

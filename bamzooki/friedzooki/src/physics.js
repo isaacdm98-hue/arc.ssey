@@ -1,7 +1,7 @@
 // Physics layer — thin wrapper over the Rapier 3D engine.
 // Real rigid bodies, colliders, and motorised revolute joints (the "muscles"
 // that drive a Zook's legs).
-import RAPIER from "@dimforge/rapier3d-compat";
+import RAPIER from "../vendor/rapier.es.js";
 
 let _ready = false;
 

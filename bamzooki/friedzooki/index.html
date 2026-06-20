@@ -24,6 +24,8 @@
   <section id="loading" class="screen show center">
     <div class="logo"><span class="fried">Fried</span>Zooki</div>
     <p class="muted">warming up the physics…</p>
+    <p id="boot-hint" class="muted small" style="display:none">Still loading — give it a moment on first run.</p>
+    <p id="boot-err" class="small" style="display:none;color:#c0506a;max-width:80vw;word-break:break-word"></p>
   </section>
 
   <!-- TITLE -->
@@ -39,7 +41,8 @@
       <button id="btn-freeroam" class="btn-bubble">🕹 Free Roam</button>
     </div>
     <div class="row" style="margin-top:10px">
-      <button id="mute-btn" class="icon-btn">🔊</button>
+      <button id="mute-btn" class="icon-btn" title="Sound effects">🔊</button>
+      <button id="narrate-btn" class="icon-btn" title="Narrator">🗣️</button>
       <button id="install" class="btn-plain" style="display:none">⬇ Install</button>
     </div>
     <p id="ios-hint" class="muted small" style="display:none">On iPhone: <b>Share ⬆ → Add to Home Screen</b></p>
@@ -157,15 +160,22 @@
     </div>
   </div>
 
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-      "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.14.0"
-    }
-  }
-  </script>
   <script type="module" src="./src/main.js"></script>
+  <script>
+    // Safety net: if a module fails to load/evaluate, show it instead of hanging
+    // forever on "warming up the physics".
+    window.addEventListener("error", (e) => {
+      if (e.message && /import|module|fetch/i.test(e.message)) showBootError(e.message);
+    });
+    window.addEventListener("unhandledrejection", (e) => showBootError((e.reason && e.reason.message) || String(e.reason)));
+    setTimeout(() => {
+      const l = document.getElementById("loading");
+      if (l && l.classList.contains("show")) document.getElementById("boot-hint").style.display = "block";
+    }, 9000);
+    function showBootError(msg) {
+      const el = document.getElementById("boot-err");
+      if (el) { el.style.display = "block"; el.textContent = "⚠ " + msg; }
+    }
+  </script>
 </body>
 </html>

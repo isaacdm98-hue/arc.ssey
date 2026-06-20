@@ -1,7 +1,10 @@
 // Rendering engine — Three.js scene, camera (orbit + follow modes), lights,
 // the main loop, and AR camera-passthrough background support.
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import * as THREE from "../vendor/three.module.js";
+import { OrbitControls } from "./orbit.js";
+import { skyTexture } from "./textures.js";
+
+const SKY = 0xeef3ea;
 
 export class Engine {
   constructor(canvas) {
@@ -10,11 +13,13 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.skyColor = new THREE.Color(0x0b0e14);
-    this.scene.background = this.skyColor;
-    this.scene.fog = new THREE.Fog(0x0b0e14, 40, 120);
+    this.skyColor = new THREE.Color(SKY);
+    this.sky = skyTexture();
+    this.scene.background = this.sky || this.skyColor;
+    this.scene.fog = new THREE.Fog(SKY, 45, 140);
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.05, 500);
     this.camera.position.set(7, 5, 10);
@@ -22,10 +27,9 @@ export class Engine {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.target.set(0, 1, 0);
-    this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
-    this.scene.add(new THREE.HemisphereLight(0xbcd8ff, 0x223018, 1.0));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    this.scene.add(new THREE.HemisphereLight(0xfff4e0, 0x9bbf86, 1.15));
+    const sun = new THREE.DirectionalLight(0xfff6e8, 1.7);
     sun.position.set(10, 18, 8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);

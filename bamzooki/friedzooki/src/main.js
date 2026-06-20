@@ -2,7 +2,7 @@
 // Hand-drawn, tactile UI. The Zook is always on stage while building. Trials run
 // with a countdown, record results to each Zook's Passport, and can be played in
 // AR on your desk.
-import * as THREE from "three";
+import * as THREE from "../vendor/three.module.js";
 import { Engine } from "./engine.js";
 import { initPhysics, createWorld } from "./physics.js";
 import { Zook, defaultGenome } from "./zook.js";
@@ -15,6 +15,15 @@ import { sfx, toggleMute, primeAudio } from "./sound.js";
 import { confetti } from "./fx.js";
 import { Net } from "./net.js";
 import { Joystick } from "./joystick.js";
+import { narrator } from "./narrator.js";
+
+const TRIAL_INTRO = {
+  sprint: "The Sprint! First Zook past the line takes it.",
+  hurdles: "Hurdles. Charge through the bars and don't get stopped.",
+  lap: "The Lap. A full circuit around the gates — keep it tight.",
+  highjump: "High Jump. Tune that spring and reach for the sky.",
+  blockpush: "Block Push. Put your shoulder in and shove it home.",
+};
 
 const $ = (s) => document.querySelector(s);
 const canvas = $("#scene");
@@ -62,6 +71,7 @@ function startContest(key) {
   contest = makeContest(key, genome, world, engine.scene, engine);
   mode = "countdown";
   $("#result").classList.remove("show");
+  narrator.say(TRIAL_INTRO[key] || "");
   runCountdown();
 }
 
@@ -72,6 +82,7 @@ function startVersus(key, gA, gB) {
   contest = makeContest(key, gA, world, engine.scene, engine, { opponents: [gB] });
   mode = "countdown";
   $("#result").classList.remove("show");
+  narrator.say(`${gA.name} versus ${gB.name}. May the best Zook win!`);
   runCountdown();
 }
 
@@ -132,6 +143,7 @@ function finishContest() {
     $("#result-text").textContent = `${CONTESTS[trialKey].label} · ${versusPair.a.name} vs ${versusPair.b.name}`;
     $("#result").classList.add("show");
     sfx.win(); confetti();
+    narrator.say(`${winner} takes the win! Glorious.`);
     return;
   }
   const c = CONTESTS[trialKey];
@@ -143,7 +155,8 @@ function finishContest() {
     : "";
   $("#result-text").textContent = r.text;
   $("#result").classList.add("show");
-  if (r.win) { sfx.win(); confetti(); } else { sfx.lose(); }
+  if (r.win) { sfx.win(); confetti(); narrator.say(rec.improved ? "A brand new record! Magnificent." : "A win! Beautifully done."); }
+  else { sfx.lose(); narrator.say("So close. Tweak your Zook and have another go."); }
 }
 
 /* --------------------------------------------------------------- screens -- */
@@ -173,6 +186,7 @@ function startFreeRoam() {
   showScreen("play");
   $("#joy-wrap").classList.remove("hidden");
   $("#hud").textContent = "Free Roam — drive with the stick, tap JUMP!";
+  narrator.say("Free roam! Use the stick to wander, and give JUMP a try.");
 }
 $("#btn-freeroam").onclick = () => { sfx.whoosh(); startFreeRoam(); };
 $("#jump-btn").onclick = () => { if (player) player.jump(); sfx.pop(); };
@@ -264,7 +278,9 @@ function showNetResult(winner) {
   $("#result-metric").textContent = "";
   $("#result-text").textContent = `${CONTESTS[trialKey].label} · online`;
   $("#result").classList.add("show");
-  if (netMine && winner === netMine.name) { sfx.win(); confetti(); } else sfx.lose();
+  const youWon = netMine && winner === netMine.name;
+  if (youWon) { sfx.win(); confetti(); } else sfx.lose();
+  narrator.say(`${winner} wins the duel!`);
 }
 
 /* ---- Versus (local hotseat) ---- */
@@ -297,6 +313,7 @@ function openBuild() {
   renderControls($("#build-controls"), $("#build-swatches"), genome, (structural) => {
     if (structural) rebuildPlayer();
   });
+  narrator.say("Welcome to the workshop. Slide the controls and watch your Zook spring to life.");
 }
 $("#build-name").oninput = (e) => { genome.name = e.target.value || "Zook"; };
 $("#build-new").onclick = () => { sfx.pop(); genome = defaultGenome("Zook " + (loadRoster().length + 1)); openBuild(); };
@@ -380,7 +397,16 @@ for (const b of document.querySelectorAll("[data-go]")) {
   b.onclick = () => { sfx.tap(); const n = b.getAttribute("data-go"); n === "build" ? openBuild() : showScreen(n); };
 }
 $("#mute-btn").onclick = (e) => { const m = toggleMute(); e.target.textContent = m ? "🔇" : "🔊"; };
-document.body.addEventListener("pointerdown", () => primeAudio(), { once: true });
+$("#narrate-btn").onclick = (e) => {
+  const on = narrator.toggle();
+  e.target.textContent = on ? "🗣️" : "🔇";
+  if (on) narrator.say("Narrator on.", { force: true });
+};
+if (!narrator.enabled) $("#narrate-btn").textContent = "🔇";
+document.body.addEventListener("pointerdown", () => {
+  primeAudio();
+  narrator.say("Welcome to FriedZooki! Build a creature, tune how it moves, then race it through the trials.");
+}, { once: true });
 
 /* ------------------------------------------------------------- helpers ---- */
 function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
@@ -393,7 +419,16 @@ function copyText(s) {
 function fmt(key, v) { return CONTESTS[key].cls.name === "HighJump" || key === "highjump" ? `${v.toFixed(2)}m` : `${v.toFixed(1)}s`; }
 
 /* ------------------------------------------------------------- startup ---- */
-(async () => { await initPhysics(); $("#loading").classList.remove("show"); showScreen("title"); })();
+(async () => {
+  try {
+    await initPhysics();
+    $("#loading").classList.remove("show");
+    showScreen("title");
+  } catch (e) {
+    const el = $("#boot-err");
+    if (el) { el.style.display = "block"; el.textContent = "⚠ Couldn't start physics: " + (e.message || e); }
+  }
+})();
 
 /* ---- PWA ---- */
 if ("serviceWorker" in navigator)

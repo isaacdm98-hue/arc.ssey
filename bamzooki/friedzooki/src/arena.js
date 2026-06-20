@@ -1,7 +1,8 @@
 // Arena helpers — build the ground and event obstacles as paired Three meshes
 // and Rapier colliders. Everything an Arena creates is removed on dispose().
-import * as THREE from "three";
+import * as THREE from "../vendor/three.module.js";
 import { RAPIER } from "./physics.js";
+import { sketchMaterial, paperTexture } from "./textures.js";
 
 export class Arena {
   constructor(world, scene) {
@@ -11,23 +12,22 @@ export class Arena {
     this.objects = [];
   }
 
-  _mat(color, opts = {}) {
-    return new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...opts });
-  }
+  _mat(color) { return sketchMaterial(color); }
 
   _add(mesh) { this.scene.add(mesh); this.objects.push(mesh); return mesh; }
 
-  /** Big flat floor at y=0. */
-  ground(color = 0x1c2738, size = 200) {
+  /** Big flat floor at y=0, with a hand-drawn paper texture. */
+  ground(color = 0x7fae7a, size = 200) {
     const desc = RAPIER.RigidBodyDesc.fixed();
     const body = this.world.createRigidBody(desc);
     this.world.createCollider(RAPIER.ColliderDesc.cuboid(size / 2, 0.5, size / 2).setFriction(1.2)
       .setTranslation(0, -0.5, 0), body);
     this.bodies.push(body);
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2), this._mat(color));
+    const map = paperTexture(new THREE.Color(color).getStyle());
+    const mat = map ? new THREE.MeshToonMaterial({ map }) : new THREE.MeshStandardMaterial({ color, roughness: 0.95 });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2), mat);
     mesh.receiveShadow = true;
     this._add(mesh);
-    this._add(new THREE.GridHelper(size, size / 2, 0x33425c, 0x222d3e));
     return this;
   }
 
